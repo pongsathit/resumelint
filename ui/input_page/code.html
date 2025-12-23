@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Resumelint - Debug Your Career</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#135bec",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#101622",
+                        "surface-dark": "#1c2333", // Slightly lighter than background-dark for cards
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        /* Custom scrollbar for text area */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #101622;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #3b4354;
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #555f75;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen flex flex-col overflow-x-hidden">
+<!-- Top Navigation -->
+<header class="w-full border-b border-gray-200 dark:border-[#282e39] bg-white/50 dark:bg-[#101622]/50 backdrop-blur-md sticky top-0 z-50">
+<div class="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 flex items-center justify-center bg-primary rounded-lg text-white">
+<span class="material-symbols-outlined text-xl">bug_report</span>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">resumelint</h2>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-sm font-medium text-slate-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors" href="#">Home</a>
+<a class="text-sm font-medium text-slate-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors" href="#">Pricing</a>
+<a class="text-sm font-medium text-slate-600 dark:text-gray-300 hover:text-primary dark:hover:text-primary transition-colors" href="#">Login</a>
+</nav>
+<button class="md:hidden text-slate-600 dark:text-gray-300">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow flex flex-col items-center justify-center py-12 px-4 sm:px-6">
+<!-- Hero Section -->
+<div class="max-w-[720px] w-full text-center mb-10">
+<h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-slate-900 dark:text-white">
+                Debug Your Career
+            </h1>
+<p class="text-lg text-slate-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
+                Upload your PDF or paste your text to get instant, AI-driven feedback tailored to your target engineering role.
+            </p>
+</div>
+<!-- Input Card -->
+<div class="w-full max-w-[800px] bg-white dark:bg-[#1c2333] rounded-2xl border border-gray-200 dark:border-[#282e39] shadow-xl overflow-hidden">
+<!-- Tabs -->
+<div class="flex border-b border-gray-200 dark:border-[#282e39]">
+<button class="flex-1 py-4 text-center font-medium text-sm border-b-2 border-primary text-primary transition-colors hover:bg-gray-50 dark:hover:bg-[#252b3d]">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">upload_file</span>
+                        Upload PDF
+                    </div>
+</button>
+<button class="flex-1 py-4 text-center font-medium text-sm border-b-2 border-transparent text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200 transition-colors hover:bg-gray-50 dark:hover:bg-[#252b3d]">
+<div class="flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">description</span>
+                        Paste Text
+                    </div>
+</button>
+</div>
+<!-- Content Area -->
+<div class="p-8">
+<!-- Drag & Drop Zone -->
+<div class="relative group cursor-pointer">
+<input accept=".pdf" class="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer" type="file"/>
+<div class="flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-[#3b4354] bg-gray-50 dark:bg-[#151a25] px-6 py-16 transition-all group-hover:border-primary/50 group-hover:bg-primary/5">
+<div class="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2">
+<span class="material-symbols-outlined text-4xl">cloud_upload</span>
+</div>
+<div class="text-center space-y-1">
+<p class="text-lg font-bold text-slate-900 dark:text-white">Drag &amp; drop your PDF here</p>
+<p class="text-sm text-slate-500 dark:text-gray-400">Limit 5MB per file • PDF only</p>
+</div>
+<button class="mt-4 px-6 py-2.5 bg-white dark:bg-[#282e39] text-slate-900 dark:text-white text-sm font-semibold rounded-lg border border-gray-200 dark:border-[#3b4354] shadow-sm hover:bg-gray-50 dark:hover:bg-[#323946] transition-colors">
+                            Browse Files
+                        </button>
+</div>
+</div>
+<!-- Hidden Text Area (for Paste functionality demonstration layout) -->
+<!-- 
+                <div class="hidden">
+                    <textarea class="w-full h-64 bg-gray-50 dark:bg-[#151a25] border border-gray-300 dark:border-[#3b4354] rounded-xl p-4 text-slate-900 dark:text-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-sm" placeholder="Paste your resume content here..."></textarea>
+                </div>
+                -->
+<!-- Configuration Bar -->
+<div class="mt-8 pt-8 border-t border-gray-200 dark:border-[#282e39] grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+<!-- Role Selector -->
+<div class="md:col-span-2">
+<label class="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-2" for="role">Target Role</label>
+<div class="relative">
+<select class="w-full appearance-none bg-white dark:bg-[#151a25] border border-gray-300 dark:border-[#3b4354] text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-3 pr-10" id="role">
+<option>Frontend Engineer</option>
+<option>Backend Engineer</option>
+<option>Fullstack Developer</option>
+<option>Mobile Developer</option>
+<option>DevOps / SRE</option>
+<option>Engineering Manager</option>
+<option>Tech Lead</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 dark:text-gray-400">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Analyze Button -->
+<div class="md:col-span-1">
+<button class="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg shadow-primary/25 active:scale-[0.98]">
+<span class="material-symbols-outlined text-[20px]">analytics</span>
+                            Analyze Resume
+                        </button>
+</div>
+</div>
+<!-- Privacy Note -->
+<div class="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-gray-500">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+<p>Your data is encrypted and not shared with recruiters.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full py-8 border-t border-gray-200 dark:border-[#282e39] bg-white dark:bg-[#101622]">
+<div class="max-w-[1200px] mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+<p class="text-sm text-slate-500 dark:text-gray-500">© 2024 Resumelint Inc. All rights reserved.</p>
+<div class="flex items-center gap-6">
+<a class="text-sm text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white transition-colors" href="#">Privacy Policy</a>
+<a class="text-sm text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white transition-colors" href="#">Terms of Service</a>
+<a class="text-sm text-slate-500 dark:text-gray-500 hover:text-slate-900 dark:hover:text-white transition-colors" href="#">Support</a>
+</div>
+</div>
+</footer>
+</body></html>
