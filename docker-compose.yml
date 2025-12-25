@@ -59,7 +59,7 @@ services:
       - ./frontend/.env:/app/.env:ro
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://backend:3000
+      - VITE_API_URL=http://localhost:3000
     networks:
       - resumelint-network
     depends_on:
