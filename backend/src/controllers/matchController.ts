@@ -1,226 +1,111 @@
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { resumes, jobDescriptions, matches, mockHelpers } from '../models/mockData';
-import { JobDescription, Match, MissingKeyword, Strength } from '../types';
+import { resumeService } from '../services/resumeService';
+import { matchService } from '../services/matchService';
+import { usageService } from '../services/usageService';
+import { sendUnauthorized, sendNotFound, sendForbidden, sendValidationError, sendRateLimitError } from '../utils/errors';
+import { ERROR_MESSAGES } from '../constants/errors';
+import { PAGINATION_DEFAULTS, RATE_LIMIT } from '../constants/validation';
 
 export const matchController = {
-  // POST /api/job-descriptions
   createJobDescription: (req: Request, res: Response) => {
     const { rawText, title, company } = req.body;
 
     if (!rawText) {
-      return res.status(400).json({
-        error: 'validation_error',
-        message: 'Job description text is required',
-        details: [{ field: 'rawText', message: 'Job description text is required' }]
-      });
+      return sendValidationError(res, 'Job description text is required', [
+        { field: 'rawText', message: 'Job description text is required' },
+      ]);
     }
 
-    const jdId = uuidv4();
-    const userId = req.user?.id;
-
-    const jobDescription: JobDescription = {
-      id: jdId,
-      userId,
+    const jobDescription = matchService.createJobDescription({
+      userId: req.user?.id,
       rawText,
-      title: title || 'Software Engineer',
-      company: company || 'Tech Company',
-      createdAt: new Date().toISOString()
-    };
-
-    jobDescriptions.set(jdId, jobDescription);
+      title,
+      company,
+    });
 
     res.json(jobDescription);
   },
 
-  // POST /api/resumes/:resumeId/match
   matchResume: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { resumeId } = req.params;
     const { jobDescriptionId, jobDescriptionText } = req.body;
 
-    const resume = resumes.get(resumeId);
+    const resume = resumeService.getResumeById(resumeId);
 
     if (!resume) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Resume not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, resumeId)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, resumeId)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    // Check usage limits
-    if (!mockHelpers.canPerformAction(req.user.id, 'matches')) {
-      return res.status(429).json({
-        error: 'rate_limit_exceeded',
-        message: 'Usage limit reached. Please upgrade to Pro.',
-        retryAfter: 86400
-      });
+    if (!usageService.canPerformAction(req.user.id, 'matches')) {
+      return sendRateLimitError(res, ERROR_MESSAGES.RATE_LIMIT, RATE_LIMIT.RETRY_AFTER);
     }
 
     let jdId = jobDescriptionId;
 
-    // Create JD if text provided
     if (!jdId && jobDescriptionText) {
-      jdId = uuidv4();
-      const jd: JobDescription = {
-        id: jdId,
+      const jd = matchService.createJobDescription({
         userId: req.user.id,
         rawText: jobDescriptionText,
         title: 'Job Position',
         company: 'Company',
-        createdAt: new Date().toISOString()
-      };
-      jobDescriptions.set(jdId, jd);
+      });
+      jdId = jd.id;
     }
 
     if (!jdId) {
-      return res.status(400).json({
-        error: 'validation_error',
-        message: 'Either jobDescriptionId or jobDescriptionText is required',
-        details: [{ field: 'jobDescriptionId/jobDescriptionText', message: 'One is required' }]
-      });
+      return sendValidationError(res, 'Either jobDescriptionId or jobDescriptionText is required', [
+        { field: 'jobDescriptionId/jobDescriptionText', message: 'One is required' },
+      ]);
     }
 
-    // Generate mock match
-    const matchId = uuidv4();
-
-    const mockMissingKeywords: MissingKeyword[] = [
-      {
-        keyword: 'Docker',
-        importance: 'high',
-        frequency: 5
-      },
-      {
-        keyword: 'GraphQL',
-        importance: 'high',
-        frequency: 4
-      },
-      {
-        keyword: 'Redis',
-        importance: 'medium',
-        frequency: 3
-      },
-      {
-        keyword: 'CI/CD',
-        importance: 'medium',
-        frequency: 2
-      }
-    ];
-
-    const mockStrengths: Strength[] = [
-      {
-        keyword: 'Node.js',
-        matchStrength: 'high',
-        context: 'Strong experience with Node.js in building scalable backend systems'
-      },
-      {
-        keyword: 'TypeScript',
-        matchStrength: 'high',
-        context: 'Proficient in TypeScript for type-safe development'
-      },
-      {
-        keyword: 'PostgreSQL',
-        matchStrength: 'medium',
-        context: 'Database experience matches job requirements'
-      }
-    ];
-
-    const match: Match = {
-      matchId,
-      resumeId,
-      jobDescriptionId: jdId,
-      matchScore: 75,
-      breakdown: {
-        keywords: 82,
-        experience: 65,
-        skills: 70,
-        education: 80
-      },
-      missingKeywords: mockMissingKeywords,
-      strengths: mockStrengths,
-      aiExplanation: {
-        summary: 'Your resume is a 75% match for this position. You have strong technical skills but are missing some key technologies mentioned in the job description.',
-        whyMismatch: 'The job description emphasizes containerization (Docker) and GraphQL experience, which are not evident in your resume. Additionally, CI/CD pipeline experience could be highlighted more prominently.',
-        priorityChanges: [
-          'Add Docker and containerization experience to your skills and project descriptions',
-          'Include any GraphQL API development work you\'ve done',
-          'Highlight CI/CD pipeline setup and automation experience'
-        ],
-        improvementTips: [
-          'Add a project showcasing microservices architecture with Docker',
-          'Mention specific GraphQL implementations if applicable',
-          'Quantify the impact of your automation work',
-          'Align your technical skills section with the job requirements'
-        ]
-      },
-      generatedAt: new Date().toISOString()
-    };
-
-    matches.set(matchId, match);
-    mockHelpers.incrementUsage(req.user.id, 'matches');
+    const match = matchService.createMatch(resumeId, jdId);
+    usageService.incrementUsage(req.user.id, 'matches');
 
     res.json(match);
   },
 
-  // GET /api/resumes/:resumeId/matches
   getResumeMatches: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { resumeId } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
+    const page = parseInt(req.query.page as string) || PAGINATION_DEFAULTS.PAGE;
+    const limit = parseInt(req.query.limit as string) || PAGINATION_DEFAULTS.LIMIT;
 
-    const resume = resumes.get(resumeId);
+    const resume = resumeService.getResumeById(resumeId);
 
     if (!resume) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Resume not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, resumeId)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, resumeId)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const resumeMatches = mockHelpers.getMatchesByResume(resumeId);
+    const resumeMatches = matchService.getResumeMatches(resumeId);
 
-    // Paginate
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedMatches = resumeMatches.slice(startIndex, endIndex);
 
-    // Map to list format
-    const matchList = paginatedMatches.map(match => {
-      const jd = jobDescriptions.get(match.jobDescriptionId);
+    const matchList = paginatedMatches.map((match) => {
+      const jd = matchService.getJobDescriptionById(match.jobDescriptionId);
       return {
         matchId: match.matchId,
         jobDescriptionId: match.jobDescriptionId,
         jobTitle: jd?.title || 'Unknown',
         company: jd?.company || 'Unknown',
         matchScore: match.matchScore,
-        createdAt: match.generatedAt
+        createdAt: match.generatedAt,
       };
     });
 
@@ -230,37 +115,27 @@ export const matchController = {
         page,
         limit,
         total: resumeMatches.length,
-        totalPages: Math.ceil(resumeMatches.length / limit)
-      }
+        totalPages: Math.ceil(resumeMatches.length / limit),
+      },
     });
   },
 
-  // GET /api/matches/:matchId
   getMatchById: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { matchId } = req.params;
-    const match = matches.get(matchId);
+    const match = matchService.getMatchById(matchId);
 
     if (!match) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Match not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.MATCH_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, match.resumeId)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, match.resumeId)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
     res.json(match);
-  }
+  },
 };

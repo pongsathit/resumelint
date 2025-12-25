@@ -1,0 +1,76 @@
+# ==============================================================================
+# Docker Compose Configuration for ResumeLint (Development)
+# Includes hot-reload support for both frontend and backend
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # Backend Service - Express.js API with TypeScript hot-reload
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: resumelint-backend
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      # Mount source code for hot-reload (read-only for safety)
+      - ./backend/src:/app/src:ro
+      # Mount environment file if it exists
+      - ./backend/.env:/app/.env:ro
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    networks:
+      - resumelint-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # Frontend Service - Vite dev server with HMR
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: resumelint-frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      # Mount source code for hot-reload (read-only for safety)
+      - ./frontend/src:/app/src:ro
+      - ./frontend/public:/app/public:ro
+      # Mount configuration files for Vite
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js:ro
+      - ./frontend/postcss.config.js:/app/postcss.config.js:ro
+      # Mount environment file if it exists
+      - ./frontend/.env:/app/.env:ro
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://backend:3000
+    networks:
+      - resumelint-network
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+# ------------------------------------------------------------------------------
+# Networks
+# ------------------------------------------------------------------------------
+networks:
+  resumelint-network:
+    driver: bridge
+    name: resumelint-network

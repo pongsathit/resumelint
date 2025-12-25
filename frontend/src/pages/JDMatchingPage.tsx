@@ -1,9 +1,92 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import ScoreCircle from '../components/ScoreCircle'
 import Badge from '../components/Badge'
 import Button from '../components/Button'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorMessage from '../components/ErrorMessage'
+import { useMatch } from '../hooks/useMatch'
+import { useResume } from '../hooks/useResume'
 
 export default function JDMatchingPage() {
+  const location = useLocation()
+  const { resumeId } = (location.state as { resumeId?: string }) || {}
+
+  const { match, isLoading: isLoadingMatch, error: matchError, clearError } = useMatch()
+  const { resume, fetchResume, isLoading: isLoadingResume } = useResume()
+
+  const isLoading = isLoadingMatch || isLoadingResume
+  const error = matchError
+
+  // Fetch resume details
+  useEffect(() => {
+    if (resumeId) {
+      fetchResume(resumeId).catch(() => {})
+    }
+  }, [resumeId, fetchResume])
+
+  // Get match data or defaults
+  const matchScore = match?.matchScore || 0
+  const breakdown = match?.breakdown || { keywords: 0, experience: 0, skills: 0, education: 0 }
+  const missingKeywords = match?.missingKeywords || []
+  const strengths = match?.strengths || []
+  const aiExplanation = match?.aiExplanation || {
+    summary: '',
+    whyMismatch: '',
+    priorityChanges: [],
+    improvementTips: []
+  }
+  const generatedAt = match?.generatedAt ? new Date(match.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'
+
+  // Show loading state
+  if (isLoading && !match) {
+    return (
+      <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner size="lg" message="Analyzing job match..." />
+          <p className="mt-4 text-slate-500 dark:text-slate-400">Comparing your resume to the job description</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error && !match) {
+    return (
+      <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <ErrorMessage
+            error={error}
+            onRetry={clearError}
+          />
+          <div className="mt-4 text-center">
+            <Link to="/job-description" state={{ resumeId }} className="text-primary hover:text-primary/80 text-sm font-medium">
+              Try again with a different job description
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Helper to get badge variant based on importance
+  const getImportanceBadgeVariant = (importance: string) => {
+    switch (importance) {
+      case 'high': return 'error'
+      case 'medium': return 'warning'
+      default: return 'neutral'
+    }
+  }
+
+  // Helper to get badge variant based on match strength
+  const getStrengthBadgeVariant = (strength: string) => {
+    switch (strength) {
+      case 'high': return 'success'
+      case 'medium': return 'success'
+      default: return 'neutral'
+    }
+  }
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen flex flex-col overflow-x-hidden">
       {/* Top Navigation */}
@@ -30,17 +113,19 @@ export default function JDMatchingPage() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3">
               <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 dark:text-white">Match Analysis</h1>
-              <Badge variant="success">Good Match</Badge>
+              <Badge variant={matchScore >= 75 ? 'success' : matchScore >= 50 ? 'warning' : 'error'}>
+                {matchScore >= 75 ? 'Good Match' : matchScore >= 50 ? 'Partial Match' : 'Low Match'}
+              </Badge>
             </div>
             <p className="text-slate-500 dark:text-slate-400 text-base">
-              Senior Frontend Engineer • <span className="font-mono text-xs">ID #8291</span> • Scanned Oct 24, 2023
+              {resume?.role || 'Engineer'} - <span className="font-mono text-xs">ID #{match?.matchId?.slice(-4) || 'N/A'}</span> - Scanned {generatedAt}
             </p>
           </div>
           <div className="flex gap-3">
             <Button variant="secondary" size="sm" icon={<span className="material-symbols-outlined text-lg">picture_as_pdf</span>}>
               Export PDF
             </Button>
-            <Link to="/rewrite">
+            <Link to="/rewrite" state={{ resumeId }}>
               <Button size="sm" icon={<span className="material-symbols-outlined text-lg">auto_fix_high</span>}>
                 Auto-Fix Resume
               </Button>
@@ -57,28 +142,37 @@ export default function JDMatchingPage() {
               Overall Match Score
             </h3>
             <div className="flex flex-col items-center justify-center flex-1 py-4">
-              <ScoreCircle score={75} size="lg" />
+              <ScoreCircle score={matchScore} size="lg" />
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/50">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-slate-500 dark:text-slate-400">Match Quality</span>
-                <span className="font-semibold text-primary">High Potential</span>
+                <span className="font-semibold text-primary">
+                  {matchScore >= 80 ? 'Excellent Match' : matchScore >= 60 ? 'High Potential' : matchScore >= 40 ? 'Moderate' : 'Needs Work'}
+                </span>
               </div>
               {/* Linear Progress Details */}
               <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
                   <span>Keywords</span>
-                  <span>82%</span>
+                  <span>{breakdown.keywords}%</span>
                 </div>
                 <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full" style={{width: '82%'}}></div>
+                  <div className={`h-full ${breakdown.keywords >= 70 ? 'bg-green-500' : breakdown.keywords >= 50 ? 'bg-amber-500' : 'bg-red-500'} rounded-full`} style={{width: `${breakdown.keywords}%`}}></div>
                 </div>
                 <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
                   <span>Experience</span>
-                  <span>65%</span>
+                  <span>{breakdown.experience}%</span>
                 </div>
                 <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full" style={{width: '65%'}}></div>
+                  <div className={`h-full ${breakdown.experience >= 70 ? 'bg-green-500' : breakdown.experience >= 50 ? 'bg-amber-500' : 'bg-red-500'} rounded-full`} style={{width: `${breakdown.experience}%`}}></div>
+                </div>
+                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-2">
+                  <span>Skills</span>
+                  <span>{breakdown.skills}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div className={`h-full ${breakdown.skills >= 70 ? 'bg-green-500' : breakdown.skills >= 50 ? 'bg-amber-500' : 'bg-red-500'} rounded-full`} style={{width: `${breakdown.skills}%`}}></div>
                 </div>
               </div>
             </div>
@@ -93,25 +187,34 @@ export default function JDMatchingPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">AI Analysis</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Generated by Resumelint AI • Just now</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Generated by Resumelint AI - {generatedAt}</p>
                 </div>
               </div>
             </div>
             <div className="p-6 flex-1 flex flex-col justify-center gap-4">
               <p className="text-slate-600 dark:text-slate-300 leading-relaxed text-base">
-                Your profile demonstrates a <strong className="text-green-600 dark:text-green-400">strong alignment</strong> with the core Frontend requirements, specifically in{' '}
-                <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono">React</span> and{' '}
-                <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-sm font-mono">TypeScript</span> architecture. However, the match score is impacted by a lack of explicit mentions regarding containerization tools and specific testing frameworks highlighted in the JD.
+                {aiExplanation.summary || 'Your resume has been analyzed against the job description. Review the missing keywords and strengths below to improve your match score.'}
               </p>
-              <div className="bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-500 p-4 rounded-r-lg">
-                <div className="flex gap-3">
-                  <span className="material-symbols-outlined text-amber-600 dark:text-amber-500 shrink-0">lightbulb</span>
-                  <div>
-                    <h4 className="text-sm font-bold text-amber-900 dark:text-amber-400 mb-1">Improvement Tip</h4>
-                    <p className="text-sm text-amber-800 dark:text-amber-200/80">Consider adding a project section detailing your experience with Docker or CI/CD pipelines to address the DevOps gap.</p>
+              {aiExplanation.whyMismatch && (
+                <p className="text-slate-500 dark:text-slate-400 text-sm">
+                  {aiExplanation.whyMismatch}
+                </p>
+              )}
+              {aiExplanation.improvementTips.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-500 p-4 rounded-r-lg">
+                  <div className="flex gap-3">
+                    <span className="material-symbols-outlined text-amber-600 dark:text-amber-500 shrink-0">lightbulb</span>
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-900 dark:text-amber-400 mb-1">Improvement Tips</h4>
+                      <ul className="text-sm text-amber-800 dark:text-amber-200/80 list-disc list-inside space-y-1">
+                        {aiExplanation.improvementTips.slice(0, 3).map((tip, index) => (
+                          <li key={index}>{tip}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -125,18 +228,25 @@ export default function JDMatchingPage() {
                 <span className="material-symbols-outlined text-red-500">warning</span>
                 Missing Keywords
               </h3>
-              <Badge variant="error">High Impact</Badge>
+              <Badge variant="error">{missingKeywords.filter(k => k.importance === 'high').length} High Impact</Badge>
             </div>
             <div className="bg-white dark:bg-surface-dark rounded-xl border border-red-200 dark:border-red-900/30 p-5 shadow-sm min-h-[200px]">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">These keywords appear frequently in the JD but are missing from your resume.</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="error" className="px-3 py-1.5">Docker</Badge>
-                <Badge variant="error" className="px-3 py-1.5">Kubernetes</Badge>
-                <Badge variant="warning" className="px-3 py-1.5">gRPC</Badge>
-                <Badge variant="warning" className="px-3 py-1.5">AWS Lambda</Badge>
-                <Badge variant="error" className="px-3 py-1.5">Cypress</Badge>
-                <Badge variant="warning" className="px-3 py-1.5">Jest</Badge>
-              </div>
+              {missingKeywords.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {missingKeywords.map((keyword, index) => (
+                    <Badge
+                      key={index}
+                      variant={getImportanceBadgeVariant(keyword.importance) as 'error' | 'warning' | 'neutral'}
+                      className="px-3 py-1.5"
+                    >
+                      {keyword.keyword}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-green-600 dark:text-green-400">No missing keywords detected!</p>
+              )}
             </div>
           </div>
 
@@ -147,20 +257,25 @@ export default function JDMatchingPage() {
                 <span className="material-symbols-outlined text-green-500">check_circle</span>
                 Matching Strengths
               </h3>
-              <Badge variant="success">Found 18</Badge>
+              <Badge variant="success">Found {strengths.length}</Badge>
             </div>
             <div className="bg-white dark:bg-surface-dark rounded-xl border border-green-200 dark:border-green-900/30 p-5 shadow-sm min-h-[200px]">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Your resume strongly emphasizes these skills required by the job.</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="success" className="px-3 py-1.5">React.js</Badge>
-                <Badge variant="success" className="px-3 py-1.5">TypeScript</Badge>
-                <Badge variant="success" className="px-3 py-1.5">Node.js</Badge>
-                <Badge variant="success" className="px-3 py-1.5">Tailwind CSS</Badge>
-                <Badge variant="success" className="px-3 py-1.5">Redux</Badge>
-                <Badge variant="success" className="px-3 py-1.5">REST API</Badge>
-                <Badge variant="success" className="px-3 py-1.5">Git</Badge>
-                <Badge variant="success" className="px-3 py-1.5">System Design</Badge>
-              </div>
+              {strengths.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {strengths.map((strength, index) => (
+                    <Badge
+                      key={index}
+                      variant={getStrengthBadgeVariant(strength.matchStrength) as 'success' | 'neutral'}
+                      className="px-3 py-1.5"
+                    >
+                      {strength.keyword}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400">No matching strengths detected yet.</p>
+              )}
             </div>
           </div>
         </div>
@@ -177,10 +292,12 @@ export default function JDMatchingPage() {
             </div>
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
-            <button className="flex-1 sm:flex-none justify-center px-6 py-2.5 rounded-lg bg-transparent border border-slate-600 text-white hover:bg-white/5 transition-colors text-sm font-semibold">
-              View Suggestions
-            </button>
-            <Link to="/rewrite" className="flex-1 sm:flex-none">
+            <Link to="/analysis" state={{ resumeId }} className="flex-1 sm:flex-none">
+              <button className="w-full justify-center px-6 py-2.5 rounded-lg bg-transparent border border-slate-600 text-white hover:bg-white/5 transition-colors text-sm font-semibold">
+                View Analysis
+              </button>
+            </Link>
+            <Link to="/rewrite" state={{ resumeId, matchId: match?.matchId }} className="flex-1 sm:flex-none">
               <Button className="w-full">
                 Improve Resume
                 <span className="material-symbols-outlined text-lg ml-2">arrow_forward</span>

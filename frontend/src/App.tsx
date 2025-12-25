@@ -1,5 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
+// Context
+import { AuthProvider } from './context/AuthContext'
+
+// Components
+import ProtectedRoute from './components/ProtectedRoute'
+
 // Pages
 import LandingPage from './pages/LandingPage'
 import InputPage from './pages/InputPage'
@@ -10,18 +16,51 @@ import ResumeRewritePage from './pages/ResumeRewritePage'
 
 function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-background-light dark:bg-background-dark">
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/input" element={<InputPage />} />
-          <Route path="/job-description" element={<JobDescriptionPage />} />
-          <Route path="/analysis" element={<AnalysisPage />} />
-          <Route path="/matching" element={<JDMatchingPage />} />
-          <Route path="/rewrite" element={<ResumeRewritePage />} />
-        </Routes>
-      </div>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <div className="min-h-screen bg-background-light dark:bg-background-dark">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/input" element={<InputPage />} />
+
+            {/* Protected Routes */}
+            <Route
+              path="/job-description"
+              element={
+                <ProtectedRoute>
+                  <JobDescriptionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analysis"
+              element={
+                <ProtectedRoute>
+                  <AnalysisPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/matching"
+              element={
+                <ProtectedRoute>
+                  <JDMatchingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/rewrite"
+              element={
+                <ProtectedRoute>
+                  <ResumeRewritePage />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </div>
+      </Router>
+    </AuthProvider>
   )
 }
 

@@ -1,26 +1,20 @@
 import { Request, Response } from 'express';
-import { users } from '../models/mockData';
+import { userService } from '../services/userService';
+import { sendUnauthorized, sendNotFound } from '../utils/errors';
+import { ERROR_MESSAGES } from '../constants/errors';
 
 export const usageController = {
-  // GET /api/usage
   getUsage: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
-    const user = users.get(req.user.id);
+    const user = userService.getUserById(req.user.id);
 
     if (!user) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'User not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
-    // Calculate reset date (first day of next month)
     const now = new Date();
     const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const resetAt = nextMonth.toISOString();
@@ -33,22 +27,22 @@ export const usageController = {
         analyses: {
           used: user.usageCount.analyses,
           limit: user.limits.maxAnalyses,
-          resetAt
+          resetAt,
         },
         matches: {
           used: user.usageCount.matches,
           limit: user.limits.maxMatches,
-          resetAt
+          resetAt,
         },
         rewrites: {
           used: user.usageCount.rewrites,
           limit: user.limits.maxRewrites,
-          resetAt
-        }
+          resetAt,
+        },
       },
       canAnalyze: isPro || user.usageCount.analyses < user.limits.maxAnalyses,
       canMatch: isPro || user.usageCount.matches < user.limits.maxMatches,
-      canRewrite: isPro || user.usageCount.rewrites < user.limits.maxRewrites
+      canRewrite: isPro || user.usageCount.rewrites < user.limits.maxRewrites,
     });
-  }
+  },
 };
