@@ -1,0 +1,432 @@
+{
+  "info": {
+    "name": "ResumeLint API",
+    "description": "Complete API collection for ResumeLint backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resumeId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login (Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"email\",\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"YOUR_REFRESH_TOKEN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User Management",
+      "item": [
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Updated\",\n  \"defaultRole\": \"Backend Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resumes",
+      "item": [
+        {
+          "name": "Create Resume (Text)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"John Doe\\nSoftware Engineer\\n\\nExperience:\\n- Senior Engineer at TechCorp\\n- Built microservices\\n\\nSkills: Node.js, TypeScript, Docker\",\n  \"role\": \"Backend Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes"]
+            }
+          }
+        },
+        {
+          "name": "List Resumes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Resume by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Resume",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analysis",
+      "item": [
+        {
+          "name": "Analyze Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"Backend Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/analyze",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "analyze"]
+            }
+          }
+        },
+        {
+          "name": "Get Latest Analysis",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/analysis",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "analysis"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job Matching",
+      "item": [
+        {
+          "name": "Create Job Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rawText\": \"Looking for Senior Backend Engineer with Node.js, Docker, Kubernetes experience\",\n  \"title\": \"Senior Backend Engineer\",\n  \"company\": \"Tech Company\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/job-descriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-descriptions"]
+            }
+          }
+        },
+        {
+          "name": "Match Resume to JD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobDescriptionText\": \"Looking for Backend Engineer with Node.js experience\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/match",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "match"]
+            }
+          }
+        },
+        {
+          "name": "Get Resume Matches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/matches",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "matches"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rewrite",
+      "item": [
+        {
+          "name": "Rewrite Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sections\": [\"experience\", \"projects\"],\n  \"focus\": \"impact\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/rewrite",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "rewrite"]
+            }
+          }
+        },
+        {
+          "name": "Get Resume Rewrites",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/resumes/{{resumeId}}/rewrites",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "resumes", "{{resumeId}}", "rewrites"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usage",
+      "item": [
+        {
+          "name": "Get Usage Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/usage",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "usage"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
