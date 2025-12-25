@@ -1,169 +1,84 @@
 import { Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import { resumes, analyses, mockHelpers } from '../models/mockData';
-import { Analysis, Suggestion } from '../types';
+import { resumeService } from '../services/resumeService';
+import { analysisService } from '../services/analysisService';
+import { usageService } from '../services/usageService';
+import { sendUnauthorized, sendNotFound, sendForbidden, sendRateLimitError } from '../utils/errors';
+import { ERROR_MESSAGES } from '../constants/errors';
+import { RATE_LIMIT } from '../constants/validation';
+import { Role } from '../types';
 
 export const analysisController = {
-  // POST /api/resumes/:id/analyze
   analyzeResume: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
     const { role } = req.body;
 
-    const resume = resumes.get(id);
+    const resume = resumeService.getResumeById(id);
 
     if (!resume) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Resume not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, id)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, id)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    // Check usage limits
-    if (!mockHelpers.canPerformAction(req.user.id, 'analyses')) {
-      return res.status(429).json({
-        error: 'rate_limit_exceeded',
-        message: 'Usage limit reached. Please upgrade to Pro.',
-        retryAfter: 86400
-      });
+    if (!usageService.canPerformAction(req.user.id, 'analyses')) {
+      return sendRateLimitError(res, ERROR_MESSAGES.RATE_LIMIT, RATE_LIMIT.RETRY_AFTER);
     }
 
-    // Generate mock analysis
-    const analysisId = uuidv4();
-    const targetRole = role || resume.role;
+    const targetRole = (role || resume.role) as Role;
+    const analysis = analysisService.createAnalysis(id, targetRole);
 
-    const mockSuggestions: Suggestion[] = [
-      {
-        id: uuidv4(),
-        section: 'experience',
-        severity: 'critical',
-        title: 'Quantify Your Impact',
-        description: 'Add specific metrics to demonstrate the scale and impact of your work',
-        originalText: 'Built scalable microservices',
-        suggestedText: 'Built scalable microservices handling 1M+ requests/day with 99.9% uptime',
-        reasoning: 'Adding quantifiable metrics makes your achievements more concrete and impressive to recruiters'
-      },
-      {
-        id: uuidv4(),
-        section: 'experience',
-        severity: 'warning',
-        title: 'Use STAR Method',
-        description: 'Structure your bullet points using Situation, Task, Action, Result format',
-        originalText: 'Led team of 5 engineers',
-        suggestedText: 'Led cross-functional team of 5 engineers to deliver a critical microservices migration, reducing infrastructure costs by 40% and improving response times by 60%',
-        reasoning: 'STAR method provides context and demonstrates leadership impact with measurable outcomes'
-      },
-      {
-        id: uuidv4(),
-        section: 'skills',
-        severity: 'info',
-        title: 'Add Relevant Technologies',
-        description: `For ${targetRole} role, consider adding: GraphQL, Redis, AWS Lambda`,
-        originalText: 'Node.js, TypeScript, PostgreSQL',
-        suggestedText: 'Node.js, TypeScript, PostgreSQL, GraphQL, Redis, AWS Lambda',
-        reasoning: 'These technologies are commonly required for modern backend engineering roles'
-      }
-    ];
-
-    const analysis: Analysis = {
-      analysisId,
-      resumeId: id,
-      scores: {
-        overall: 82,
-        clarity: 90,
-        impact: 65,
-        atsFriendliness: 88,
-        technicalDepth: 85
-      },
-      suggestions: mockSuggestions,
-      summary: `Your resume shows strong technical foundation for a ${targetRole} position. Key areas for improvement: quantifying impact with metrics (65% score), adding more context using STAR method, and ensuring ATS compatibility. Your technical depth is solid, but adding specific project outcomes would strengthen your profile.`,
-      generatedAt: new Date().toISOString()
-    };
-
-    analyses.set(analysisId, analysis);
-    mockHelpers.incrementUsage(req.user.id, 'analyses');
+    usageService.incrementUsage(req.user.id, 'analyses');
 
     res.json(analysis);
   },
 
-  // GET /api/resumes/:id/analysis
   getLatestAnalysis: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const resume = resumes.get(id);
+    const resume = resumeService.getResumeById(id);
 
     if (!resume) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Resume not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, id)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, id)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const resumeAnalyses = mockHelpers.getAnalysesByResume(id);
-
-    if (resumeAnalyses.length === 0) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'No analysis found for this resume'
-      });
-    }
-
-    res.json(resumeAnalyses[0]); // Most recent
-  },
-
-  // GET /api/analyses/:analysisId
-  getById: (req: Request, res: Response) => {
-    if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
-    }
-
-    const { analysisId } = req.params;
-    const analysis = analyses.get(analysisId);
+    const analysis = analysisService.getLatestResumeAnalysis(id);
 
     if (!analysis) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Analysis not found'
-      });
-    }
-
-    // Check if user owns the resume
-    if (!mockHelpers.userOwnsResume(req.user.id, analysis.resumeId)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.NO_ANALYSIS_FOUND);
     }
 
     res.json(analysis);
-  }
+  },
+
+  getById: (req: Request, res: Response) => {
+    if (!req.user) {
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
+    }
+
+    const { analysisId } = req.params;
+    const analysis = analysisService.getAnalysisById(analysisId);
+
+    if (!analysis) {
+      return sendNotFound(res, ERROR_MESSAGES.ANALYSIS_NOT_FOUND);
+    }
+
+    if (!resumeService.userOwnsResume(req.user.id, analysis.resumeId)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
+    }
+
+    res.json(analysis);
+  },
 };

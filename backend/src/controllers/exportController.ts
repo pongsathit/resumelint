@@ -1,67 +1,49 @@
 import { Request, Response } from 'express';
-import { resumes, rewrites, matches, mockHelpers } from '../models/mockData';
+import { resumeService } from '../services/resumeService';
+import { sendUnauthorized, sendNotFound, sendForbidden, sendValidationError } from '../utils/errors';
+import { validateExportType } from '../utils/validators';
+import { ERROR_MESSAGES } from '../constants/errors';
 
 export const exportController = {
-  // POST /api/resumes/:id/export
   exportResume: (req: Request, res: Response) => {
     if (!req.user) {
-      return res.status(401).json({
-        error: 'unauthorized',
-        message: 'Authentication required'
-      });
+      return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const { type, rewriteId, matchId, format } = req.body;
+    const { type, rewriteId, matchId } = req.body;
 
-    const resume = resumes.get(id);
+    const resume = resumeService.getResumeById(id);
 
     if (!resume) {
-      return res.status(404).json({
-        error: 'not_found',
-        message: 'Resume not found'
-      });
+      return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!mockHelpers.userOwnsResume(req.user.id, id)) {
-      return res.status(403).json({
-        error: 'forbidden',
-        message: 'You do not have permission to access this resource'
-      });
+    if (!resumeService.userOwnsResume(req.user.id, id)) {
+      return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    // Validate export type
-    if (!['resume', 'analysis', 'match', 'rewrite'].includes(type)) {
-      return res.status(400).json({
-        error: 'validation_error',
-        message: 'Invalid export type',
-        details: [{ field: 'type', message: 'Type must be resume, analysis, match, or rewrite' }]
-      });
+    const typeValidation = validateExportType(type);
+    if (!typeValidation.isValid) {
+      return sendValidationError(res, 'Invalid export type', typeValidation.details);
     }
 
-    // Validate required IDs
     if (type === 'rewrite' && !rewriteId) {
-      return res.status(400).json({
-        error: 'validation_error',
-        message: 'rewriteId is required for rewrite export',
-        details: [{ field: 'rewriteId', message: 'Required for rewrite type' }]
-      });
+      return sendValidationError(res, 'rewriteId is required for rewrite export', [
+        { field: 'rewriteId', message: 'Required for rewrite type' },
+      ]);
     }
 
     if (type === 'match' && !matchId) {
-      return res.status(400).json({
-        error: 'validation_error',
-        message: 'matchId is required for match export',
-        details: [{ field: 'matchId', message: 'Required for match type' }]
-      });
+      return sendValidationError(res, 'matchId is required for match export', [
+        { field: 'matchId', message: 'Required for match type' },
+      ]);
     }
 
-    // In a real implementation, this would generate a PDF
-    // For mock, we return a text representation as PDF
     const mockPdfContent = `Mock PDF Export\nType: ${type}\nResume ID: ${id}\nGenerated: ${new Date().toISOString()}`;
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${type}-${id}.pdf"`);
     res.send(Buffer.from(mockPdfContent));
-  }
+  },
 };

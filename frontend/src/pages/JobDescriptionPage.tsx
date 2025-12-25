@@ -1,10 +1,47 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import Button from '../components/Button'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorMessage from '../components/ErrorMessage'
+import { useMatch } from '../hooks/useMatch'
+import { useResume } from '../hooks/useResume'
 
 export default function JobDescriptionPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [jdText, setJdText] = useState('')
+
+  // Get resumeId from navigation state
+  const { resumeId } = (location.state as { resumeId?: string }) || {}
+
+  const { matchResume, isLoading: isMatching, error: matchError, clearError: clearMatchError } = useMatch()
+  const { resume, fetchResume, isLoading: isLoadingResume, error: resumeError } = useResume()
+
+  const isLoading = isMatching || isLoadingResume
+  const error = matchError || resumeError
+
+  // Fetch resume details if we have resumeId
+  useEffect(() => {
+    if (resumeId) {
+      fetchResume(resumeId).catch(() => {
+        // Error handled by hook
+      })
+    }
+  }, [resumeId, fetchResume])
+
+  const handleCompare = async () => {
+    if (!resumeId || !jdText.trim()) return
+
+    try {
+      clearMatchError()
+      await matchResume(resumeId, undefined, jdText)
+      navigate('/matching', { state: { resumeId } })
+    } catch (err) {
+      // Error handled by hook
+      console.error('Failed to match resume:', err)
+    }
+  }
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display min-h-screen flex flex-col overflow-x-hidden">
@@ -52,20 +89,48 @@ export default function JobDescriptionPage() {
 
           {/* Active Resume Card */}
           <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="flex items-center justify-center size-10 rounded-lg bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 shrink-0">
-                <span className="material-symbols-outlined">picture_as_pdf</span>
+            {resume ? (
+              <>
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="flex items-center justify-center size-10 rounded-lg bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 shrink-0">
+                    <span className="material-symbols-outlined">picture_as_pdf</span>
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Resume</span>
+                    <span className="text-slate-900 dark:text-white font-medium truncate">{resume.fileName}</span>
+                  </div>
+                </div>
+                <Link
+                  to="/input"
+                  className="text-sm font-medium text-primary hover:text-blue-400 transition-colors flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg hover:bg-primary/10"
+                >
+                  Switch Resume
+                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center gap-3 w-full">
+                <div className="flex items-center justify-center size-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 shrink-0">
+                  <span className="material-symbols-outlined">description</span>
+                </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">No Resume Selected</span>
+                  <Link to="/input" className="text-primary hover:text-blue-400 font-medium text-sm">
+                    Upload a resume first
+                  </Link>
+                </div>
               </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Resume</span>
-                <span className="text-slate-900 dark:text-white font-medium truncate">Software_Engineer_v3_Final.pdf</span>
-              </div>
-            </div>
-            <button className="text-sm font-medium text-primary hover:text-blue-400 transition-colors flex items-center gap-1 shrink-0 px-3 py-1.5 rounded-lg hover:bg-primary/10">
-              Switch Resume
-              <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-            </button>
+            )}
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <ErrorMessage
+              error={error}
+              onDismiss={clearMatchError}
+              className="mt-4"
+            />
+          )}
 
           {/* Input Area */}
           <div className="flex flex-col gap-2">
@@ -105,16 +170,24 @@ Requirements:
           <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-4 pt-2 pb-10">
             <button
               onClick={() => setJdText('')}
-              className="w-full sm:w-auto h-12 px-6 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium text-sm transition-colors hover:bg-slate-100 dark:hover:bg-white/5"
+              disabled={isLoading}
+              className="w-full sm:w-auto h-12 px-6 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium text-sm transition-colors hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Clear Text
             </button>
-            <Link to="/matching">
-              <Button size="lg" className="w-full sm:w-auto">
+            <Button
+              size="lg"
+              className="w-full sm:w-auto"
+              disabled={isLoading || !resumeId || !jdText.trim()}
+              onClick={handleCompare}
+            >
+              {isLoading ? (
+                <LoadingSpinner size="sm" />
+              ) : (
                 <span className="material-symbols-outlined group-hover:animate-pulse">analytics</span>
-                Compare with Resume
-              </Button>
-            </Link>
+              )}
+              {isLoading ? 'Analyzing...' : 'Compare with Resume'}
+            </Button>
           </div>
         </div>
       </main>

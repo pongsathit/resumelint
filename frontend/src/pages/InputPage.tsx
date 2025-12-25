@@ -1,21 +1,44 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/Button'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorMessage from '../components/ErrorMessage'
+import { useResume } from '../hooks/useResume'
+import { useAnalysis } from '../hooks/useAnalysis'
+import { Role } from '../services/api'
 
 export default function InputPage() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'upload' | 'paste'>('upload')
-  const [selectedRole, setSelectedRole] = useState('Frontend Engineer')
+  const [selectedRole, setSelectedRole] = useState<Role>('Frontend Engineer')
+  const [resumeText, setResumeText] = useState('')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
+
+  const { uploadResume, isLoading: isUploading, error: uploadError, clearError: clearUploadError } = useResume()
+  const { analyzeResume, isLoading: isAnalyzing, error: analysisError, clearError: clearAnalysisError } = useAnalysis()
+
+  const isLoading = isUploading || isAnalyzing
+  const error = uploadError || analysisError
+
+  const clearError = useCallback(() => {
+    clearUploadError()
+    clearAnalysisError()
+  }, [clearUploadError, clearAnalysisError])
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      setUploadedFile(acceptedFiles[0])
+      clearError()
+    }
+  }, [clearError])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf']
     },
     maxSize: 5242880, // 5MB
-    onDrop: (acceptedFiles) => {
-      console.log('Files uploaded:', acceptedFiles)
-      // Handle file upload logic here
-    }
+    onDrop,
   })
 
   return (
@@ -86,26 +109,65 @@ export default function InputPage() {
 
           {/* Content Area */}
           <div className="p-8">
+            {/* Error Message */}
+            {error && (
+              <ErrorMessage
+                error={error}
+                onRetry={clearError}
+                onDismiss={clearError}
+                className="mb-6"
+              />
+            )}
+
             {activeTab === 'upload' ? (
               <div {...getRootProps()} className="relative group cursor-pointer">
                 <input {...getInputProps()} />
                 <div className={`flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed bg-gray-50 dark:bg-[#151a25] px-6 py-16 transition-all ${
-                  isDragActive
+                  uploadedFile
+                    ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
+                    : isDragActive
                     ? 'border-primary bg-primary/5'
                     : 'border-gray-300 dark:border-[#3b4354] group-hover:border-primary/50 group-hover:bg-primary/5'
                 }`}>
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2">
-                    <span className="material-symbols-outlined text-4xl">cloud_upload</span>
-                  </div>
-                  <div className="text-center space-y-1">
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">
-                      {isDragActive ? 'Drop your PDF here' : 'Drag & drop your PDF here'}
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-gray-400">Limit 5MB per file • PDF only</p>
-                  </div>
-                  <button className="mt-4 px-6 py-2.5 bg-white dark:bg-[#282e39] text-slate-900 dark:text-white text-sm font-semibold rounded-lg border border-gray-200 dark:border-[#3b4354] shadow-sm hover:bg-gray-50 dark:hover:bg-[#323946] transition-colors">
-                    Browse Files
-                  </button>
+                  {uploadedFile ? (
+                    <>
+                      <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center text-green-600 dark:text-green-400 mb-2">
+                        <span className="material-symbols-outlined text-4xl">check_circle</span>
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                          {uploadedFile.name}
+                        </p>
+                        <p className="text-sm text-slate-500 dark:text-gray-400">
+                          {(uploadedFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setUploadedFile(null)
+                        }}
+                        className="mt-4 px-6 py-2.5 bg-white dark:bg-[#282e39] text-slate-900 dark:text-white text-sm font-semibold rounded-lg border border-gray-200 dark:border-[#3b4354] shadow-sm hover:bg-gray-50 dark:hover:bg-[#323946] transition-colors"
+                      >
+                        Choose Different File
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-2">
+                        <span className="material-symbols-outlined text-4xl">cloud_upload</span>
+                      </div>
+                      <div className="text-center space-y-1">
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                          {isDragActive ? 'Drop your PDF here' : 'Drag & drop your PDF here'}
+                        </p>
+                        <p className="text-sm text-slate-500 dark:text-gray-400">Limit 5MB per file - PDF only</p>
+                      </div>
+                      <button className="mt-4 px-6 py-2.5 bg-white dark:bg-[#282e39] text-slate-900 dark:text-white text-sm font-semibold rounded-lg border border-gray-200 dark:border-[#3b4354] shadow-sm hover:bg-gray-50 dark:hover:bg-[#323946] transition-colors">
+                        Browse Files
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -113,6 +175,9 @@ export default function InputPage() {
                 <textarea
                   className="w-full h-64 bg-gray-50 dark:bg-[#151a25] border border-gray-300 dark:border-[#3b4354] rounded-xl p-4 text-slate-900 dark:text-gray-200 focus:ring-2 focus:ring-primary focus:border-transparent outline-none resize-none font-mono text-sm"
                   placeholder="Paste your resume content here..."
+                  value={resumeText}
+                  onChange={(e) => setResumeText(e.target.value)}
+                  disabled={isLoading}
                 />
               </div>
             )}
@@ -128,16 +193,15 @@ export default function InputPage() {
                   <select
                     id="role"
                     value={selectedRole}
-                    onChange={(e) => setSelectedRole(e.target.value)}
-                    className="w-full appearance-none bg-white dark:bg-[#151a25] border border-gray-300 dark:border-[#3b4354] text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-3 pr-10"
+                    onChange={(e) => setSelectedRole(e.target.value as Role)}
+                    disabled={isLoading}
+                    className="w-full appearance-none bg-white dark:bg-[#151a25] border border-gray-300 dark:border-[#3b4354] text-slate-900 dark:text-white text-sm rounded-lg focus:ring-primary focus:border-primary block p-3 pr-10 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option>Frontend Engineer</option>
-                    <option>Backend Engineer</option>
-                    <option>Fullstack Developer</option>
-                    <option>Mobile Developer</option>
-                    <option>DevOps / SRE</option>
-                    <option>Engineering Manager</option>
-                    <option>Tech Lead</option>
+                    <option value="Frontend Engineer">Frontend Engineer</option>
+                    <option value="Backend Engineer">Backend Engineer</option>
+                    <option value="Fullstack Developer">Fullstack Developer</option>
+                    <option value="Mobile Developer">Mobile Developer</option>
+                    <option value="Tech Lead">Tech Lead</option>
                   </select>
                   <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 dark:text-gray-400">
                     <span className="material-symbols-outlined">expand_more</span>
@@ -147,12 +211,37 @@ export default function InputPage() {
 
               {/* Analyze Button */}
               <div className="md:col-span-1">
-                <Link to="/analysis">
-                  <Button className="w-full">
+                <Button
+                  className="w-full"
+                  disabled={isLoading || (activeTab === 'upload' ? !uploadedFile : !resumeText.trim())}
+                  onClick={async () => {
+                    try {
+                      clearError()
+                      // Upload the resume
+                      const resume = await uploadResume(
+                        activeTab === 'upload' ? uploadedFile : null,
+                        activeTab === 'paste' ? resumeText : null,
+                        selectedRole
+                      )
+                      // Analyze the uploaded resume
+                      await analyzeResume(resume.id, selectedRole)
+                      // Navigate to analysis page with resume and analysis data
+                      navigate('/analysis', {
+                        state: { resumeId: resume.id, role: selectedRole }
+                      })
+                    } catch (err) {
+                      // Error is already handled by hooks
+                      console.error('Failed to analyze resume:', err)
+                    }
+                  }}
+                >
+                  {isLoading ? (
+                    <LoadingSpinner size="sm" />
+                  ) : (
                     <span className="material-symbols-outlined text-[20px]">analytics</span>
-                    Analyze Resume
-                  </Button>
-                </Link>
+                  )}
+                  {isUploading ? 'Uploading...' : isAnalyzing ? 'Analyzing...' : 'Analyze Resume'}
+                </Button>
               </div>
             </div>
 

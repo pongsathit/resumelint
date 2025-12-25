@@ -1,8 +1,105 @@
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import Breadcrumb from '../components/Breadcrumb'
 import Button from '../components/Button'
+import LoadingSpinner from '../components/LoadingSpinner'
+import ErrorMessage from '../components/ErrorMessage'
+import { useRewrite } from '../hooks/useRewrite'
+import { useResume } from '../hooks/useResume'
 
 export default function ResumeRewritePage() {
+  const location = useLocation()
+  const { resumeId, matchId } = (location.state as { resumeId?: string; matchId?: string }) || {}
+
+  const [editedContent, setEditedContent] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const {
+    rewrite,
+    rewriteResume,
+    updateRewrite,
+    isLoading: isLoadingRewrite,
+    error: rewriteError,
+    clearError: clearRewriteError
+  } = useRewrite()
+
+  const {
+    resume,
+    fetchResume,
+    isLoading: isLoadingResume,
+    error: resumeError
+  } = useResume()
+
+  const isLoading = isLoadingRewrite || isLoadingResume
+  const error = rewriteError || resumeError
+
+  // Fetch resume and trigger rewrite
+  useEffect(() => {
+    if (resumeId) {
+      fetchResume(resumeId).catch(() => {})
+      // Trigger rewrite if we don't have one yet
+      rewriteResume(resumeId, matchId ? { jobDescriptionId: matchId } : undefined).catch(() => {})
+    }
+  }, [resumeId, matchId, fetchResume, rewriteResume])
+
+  // Set edited content when rewrite is loaded
+  useEffect(() => {
+    if (rewrite?.rewrittenText) {
+      setEditedContent(rewrite.rewrittenText)
+    }
+  }, [rewrite?.rewrittenText])
+
+  const handleSave = async () => {
+    if (!rewrite?.rewriteId) return
+
+    setIsSaving(true)
+    try {
+      await updateRewrite(rewrite.rewriteId, editedContent)
+    } catch (err) {
+      console.error('Failed to save:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Show loading state
+  if (isLoading && !rewrite) {
+    return (
+      <div className="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white font-display overflow-hidden h-screen flex flex-col items-center justify-center">
+        <LoadingSpinner size="lg" message="Generating AI rewrite..." />
+        <p className="mt-4 text-slate-500 dark:text-slate-400">This may take a moment</p>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error && !rewrite) {
+    return (
+      <div className="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white font-display overflow-hidden h-screen flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <ErrorMessage
+            error={error}
+            onRetry={() => {
+              clearRewriteError()
+              if (resumeId) {
+                rewriteResume(resumeId)
+              }
+            }}
+          />
+          <div className="mt-4 text-center">
+            <Link to="/input" className="text-primary hover:text-primary/80 text-sm font-medium">
+              Upload a new resume
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const scoreImprovement = rewrite?.scoreImprovement || { before: 0, after: 0, delta: 0 }
+  const changes = rewrite?.changes || []
+  const originalText = rewrite?.originalText || resume?.rawText || ''
+
   return (
     <div className="bg-background-light dark:bg-background-dark text-[#111318] dark:text-white font-display overflow-hidden h-screen flex flex-col">
       {/* Top Navigation */}
@@ -36,15 +133,19 @@ export default function ResumeRewritePage() {
               {/* Breadcrumbs */}
               <Breadcrumb items={[
                 { label: 'Home', href: '/' },
-                { label: 'Resumes', href: '#' },
-                { label: 'Software Engineer V1' }
+                { label: 'Resumes', href: '/input' },
+                { label: resume?.fileName || 'Resume Rewrite' }
               ]} />
 
               {/* Page Heading & Primary Actions */}
               <div className="flex flex-wrap justify-between items-end gap-3 pb-2 border-b border-border-dark">
                 <div className="flex min-w-72 flex-col gap-1">
                   <h1 className="text-white tracking-tight text-3xl font-bold leading-tight">Resume Rewrite</h1>
-                  <p className="text-[#9da6b9] text-sm font-normal">Last edited 2 minutes ago</p>
+                  <p className="text-[#9da6b9] text-sm font-normal">
+                    {rewrite?.generatedAt
+                      ? `Generated ${new Date(rewrite.generatedAt).toLocaleString()}`
+                      : 'Generating...'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button variant="secondary" size="sm" icon={<span className="material-symbols-outlined text-[18px]">history</span>}>
@@ -53,8 +154,8 @@ export default function ResumeRewritePage() {
                   <Button variant="secondary" size="sm" icon={<span className="material-symbols-outlined text-[18px]">download</span>}>
                     Export PDF
                   </Button>
-                  <Button size="sm">
-                    Save Changes
+                  <Button size="sm" onClick={handleSave} disabled={isSaving || !rewrite}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </div>
               </div>
@@ -102,7 +203,10 @@ export default function ResumeRewritePage() {
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 px-3 py-1 rounded bg-green-500/10 border border-green-500/20">
                     <span className="text-green-400 text-xs font-bold uppercase tracking-wider">Score</span>
-                    <span className="text-white text-sm font-bold">85/100</span>
+                    <span className="text-white text-sm font-bold">{scoreImprovement.after}/100</span>
+                    {scoreImprovement.delta > 0 && (
+                      <span className="text-green-400 text-xs font-bold">+{scoreImprovement.delta}</span>
+                    )}
                   </div>
                 </div>
               </div>

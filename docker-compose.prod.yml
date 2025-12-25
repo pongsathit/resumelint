@@ -1,0 +1,33 @@
+# ==============================================================================
+# Docker Compose Production Overrides for ResumeLint
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # Backend Service - Production overrides
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      target: production
+    container_name: resumelint-backend-prod
+    volumes: []  # Remove all volume mounts for production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+
+  # ----------------------------------------------------------------------------
+  # Frontend Service - Production overrides
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      target: production
+    container_name: resumelint-frontend-prod
+    ports:
+      - "${FRONTEND_PORT_PROD:-80}:80"  # Use port 80 for nginx
+    volumes: []  # Remove all volume mounts for production
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
