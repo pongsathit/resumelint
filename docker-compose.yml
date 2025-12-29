@@ -3,8 +3,6 @@
 # Includes hot-reload support for both frontend and backend
 # ==============================================================================
 
-version: '3.8'
-
 services:
   # ----------------------------------------------------------------------------
   # Backend Service - Express.js API with TypeScript hot-reload
@@ -25,8 +23,17 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
+      # Database connection (uses service name as hostname)
+      - DATABASE_HOST=database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${POSTGRES_DB:-resumelint}
+      - DATABASE_USER=${POSTGRES_USER:-resumelint_user}
+      - DATABASE_PASSWORD=${POSTGRES_PASSWORD:-resumelint_password}
     networks:
       - resumelint-network
+    depends_on:
+      database:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -67,6 +74,38 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # ----------------------------------------------------------------------------
+  # Database Service - PostgreSQL for persistent data storage
+  # ----------------------------------------------------------------------------
+  database:
+    image: postgres:16-alpine
+    container_name: resumelint-database
+    environment:
+      # PostgreSQL configuration
+      POSTGRES_DB: ${POSTGRES_DB:-resumelint}
+      POSTGRES_USER: ${POSTGRES_USER:-resumelint_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resumelint_password}
+      # Performance tuning for development
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    volumes:
+      # Persistent data storage using named volume
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Mount initialization scripts (create tables, seed data, etc.)
+      # Uncomment the line below if you create a docker/postgres/init.sql file
+      # - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - resumelint-network
+    healthcheck:
+      # Check if PostgreSQL is ready to accept connections
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resumelint_user} -d ${POSTGRES_DB:-resumelint}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+    # Security: Database is only accessible within Docker network
+    # No ports exposed to host machine for production-like security
+
 # ------------------------------------------------------------------------------
 # Networks
 # ------------------------------------------------------------------------------
@@ -74,3 +113,14 @@ networks:
   resumelint-network:
     driver: bridge
     name: resumelint-network
+
+# ------------------------------------------------------------------------------
+# Volumes - Persistent data storage
+# ------------------------------------------------------------------------------
+volumes:
+  # PostgreSQL data persistence
+  # Data survives container restarts and removals
+  # To reset database: docker-compose down -v
+  postgres_data:
+    driver: local
+    name: resumelint_postgres_data
