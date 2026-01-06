@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { rewrites, mockHelpers } from '../models/mockData';
+import { RewriteRepository } from '../repositories';
 import { Rewrite, Change } from '../types';
 
 const generateMockChanges = (): Change[] => {
@@ -33,10 +33,10 @@ const generateRewrittenText = (originalText: string): string => {
 };
 
 export const rewriteService = {
-  createRewrite: (resumeId: string, originalText: string): Rewrite => {
+  createRewrite: async (resumeId: string, originalText: string): Promise<Rewrite> => {
     const rewriteId = uuidv4();
 
-    const rewrite: Rewrite = {
+    return await RewriteRepository.createRewrite({
       rewriteId,
       resumeId,
       originalText,
@@ -47,38 +47,19 @@ export const rewriteService = {
         after: 85,
         delta: 20,
       },
-      version: 1,
-      generatedAt: new Date().toISOString(),
-    };
-
-    rewrites.set(rewriteId, rewrite);
-    return rewrite;
+    });
   },
 
-  getRewriteById: (rewriteId: string): Rewrite | null => {
-    return rewrites.get(rewriteId) || null;
+  getRewriteById: async (rewriteId: string): Promise<Rewrite | null> => {
+    return await RewriteRepository.getRewriteById(rewriteId);
   },
 
-  getResumeRewrites: (resumeId: string): Rewrite[] => {
-    return mockHelpers.getRewritesByResume(resumeId);
+  getResumeRewrites: async (resumeId: string): Promise<Rewrite[]> => {
+    return await RewriteRepository.getResumeRewrites(resumeId);
   },
 
-  updateRewrite: (rewriteId: string, updates: { rewrittenText?: string; changes?: Change[] }): Rewrite | null => {
-    const rewrite = rewrites.get(rewriteId);
-    if (!rewrite) {
-      return null;
-    }
-
-    if (updates.rewrittenText) {
-      rewrite.rewrittenText = updates.rewrittenText;
-    }
-    if (updates.changes) {
-      rewrite.changes = updates.changes;
-    }
-    rewrite.version += 1;
-    rewrite.updatedAt = new Date().toISOString();
-
-    return rewrite;
+  updateRewrite: async (rewriteId: string, updates: { rewrittenText?: string; changes?: Change[] }): Promise<Rewrite | null> => {
+    return await RewriteRepository.updateRewrite(rewriteId, updates);
   },
 
   improveRewrite: (prompt: string) => {

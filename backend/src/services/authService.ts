@@ -1,37 +1,53 @@
-import { mockHelpers } from '../models/mockData';
+import { AuthRepository } from '../repositories';
 import { User, AuthTokens, Provider } from '../types';
 
 export const authService = {
-  authenticateWithEmail: (email: string, password: string): User | null => {
-    return mockHelpers.getUserByCredentials(email, password) || null;
+  authenticateWithEmail: async (email: string, password: string): Promise<User | null> => {
+    return await AuthRepository.getUserByCredentials(email, password);
   },
 
-  authenticateWithOAuth: (provider: Provider, code: string): User | null => {
-    return mockHelpers.getUserByOAuth(provider, code) || null;
+  authenticateWithOAuth: async (provider: Provider, code: string): Promise<User | null> => {
+    return await AuthRepository.getUserByOAuth(provider, code);
   },
 
-  generateTokens: (userId: string): AuthTokens => {
+  generateTokens: async (userId: string): Promise<AuthTokens> => {
+    // Generate unique tokens
+    const accessToken = `access-token-${Date.now()}-${Math.random()}`;
+    const refreshToken = `refresh-token-${Date.now()}-${Math.random()}`;
+
+    // Store in database
+    await AuthRepository.createAccessToken(userId, accessToken);
+    await AuthRepository.createRefreshToken(userId, refreshToken);
+
     return {
-      accessToken: mockHelpers.createAccessToken(userId),
-      refreshToken: mockHelpers.createRefreshToken(userId),
+      accessToken,
+      refreshToken,
     };
   },
 
-  refreshTokens: (refreshToken: string): { user: User; tokens: AuthTokens } | null => {
-    const user = mockHelpers.getUserByRefreshToken(refreshToken);
+  refreshTokens: async (refreshToken: string): Promise<{ user: User; tokens: AuthTokens } | null> => {
+    const user = await AuthRepository.getUserByRefreshToken(refreshToken);
     if (!user) {
       return null;
     }
 
-    const tokens = {
-      accessToken: mockHelpers.createAccessToken(user.id),
-      refreshToken: mockHelpers.createRefreshToken(user.id),
-    };
+    // Generate new tokens
+    const accessToken = `access-token-${Date.now()}-${Math.random()}`;
+    const newRefreshToken = `refresh-token-${Date.now()}-${Math.random()}`;
 
-    return { user, tokens };
+    await AuthRepository.createAccessToken(user.id, accessToken);
+    await AuthRepository.createRefreshToken(user.id, newRefreshToken);
+
+    return {
+      user,
+      tokens: {
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
+    };
   },
 
-  revokeUserTokens: (userId: string): void => {
-    mockHelpers.revokeTokens(userId);
+  revokeUserTokens: async (userId: string): Promise<void> => {
+    await AuthRepository.revokeUserTokens(userId);
   },
 };

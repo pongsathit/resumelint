@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { resumes, mockHelpers } from '../models/mockData';
+import { ResumeRepository } from '../repositories';
 import { Resume, Role } from '../types';
 
 interface CreateResumeParams {
@@ -20,85 +20,83 @@ interface ResumeListItem {
 }
 
 export const resumeService = {
-  createResume: (params: CreateResumeParams): Resume => {
+  createResume: async (params: CreateResumeParams): Promise<Resume> => {
     const { userId, rawText, fileName, role } = params;
-    const resumeId = uuidv4();
 
-    const resume: Resume = {
-      id: resumeId,
-      userId,
-      fileName,
-      rawText,
-      parsedSections: {
-        contact: {
-          name: 'John Doe',
-          email: 'john.doe@example.com',
-          phone: '+1-555-0100',
-          location: 'San Francisco, CA',
-        },
-        experience: [
-          {
-            title: 'Senior Backend Engineer',
-            company: 'Tech Corp',
-            duration: '2020-2024',
-            description: 'Built scalable microservices handling 1M+ requests/day',
-          },
-        ],
-        education: [
-          {
-            degree: 'BS Computer Science',
-            institution: 'Stanford University',
-            year: '2019',
-          },
-        ],
-        skills: ['Node.js', 'TypeScript', 'PostgreSQL', 'Docker', 'Kubernetes'],
-        projects: [
-          {
-            name: 'E-commerce Platform',
-            description: 'Built a full-stack e-commerce platform with React and Node.js',
-          },
-        ],
+    const parsedSections = {
+      contact: {
+        name: 'John Doe',
+        email: 'john.doe@example.com',
+        phone: '+1-555-0100',
+        location: 'San Francisco, CA',
       },
-      role,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'parsed',
+      experience: [
+        {
+          title: 'Senior Backend Engineer',
+          company: 'Tech Corp',
+          duration: '2020-2024',
+          description: 'Built scalable microservices handling 1M+ requests/day',
+        },
+      ],
+      education: [
+        {
+          degree: 'BS Computer Science',
+          institution: 'Stanford University',
+          year: '2019',
+        },
+      ],
+      skills: ['Node.js', 'TypeScript', 'PostgreSQL', 'Docker', 'Kubernetes'],
+      projects: [
+        {
+          name: 'E-commerce Platform',
+          description: 'Built a full-stack e-commerce platform with React and Node.js',
+        },
+      ],
     };
 
-    resumes.set(resumeId, resume);
-    return resume;
-  },
-
-  getResumeById: (resumeId: string): Resume | null => {
-    return resumes.get(resumeId) || null;
-  },
-
-  getUserResumes: (userId: string): Resume[] => {
-    return mockHelpers.getResumesByUser(userId);
-  },
-
-  getResumeListItems: (resumes: Resume[]): ResumeListItem[] => {
-    return resumes.map((resume) => {
-      const analyses = mockHelpers.getAnalysesByResume(resume.id);
-      const matches = mockHelpers.getMatchesByResume(resume.id);
-
-      return {
-        id: resume.id,
-        fileName: resume.fileName,
-        role: resume.role,
-        createdAt: resume.createdAt,
-        updatedAt: resume.updatedAt,
-        hasAnalysis: analyses.length > 0,
-        hasMatch: matches.length > 0,
-      };
+    return await ResumeRepository.createResume({
+      userId,
+      rawText,
+      fileName,
+      role,
+      parsedSections,
     });
   },
 
-  deleteResume: (resumeId: string): boolean => {
-    return resumes.delete(resumeId);
+  getResumeById: async (resumeId: string): Promise<Resume | null> => {
+    return await ResumeRepository.getResumeById(resumeId);
   },
 
-  userOwnsResume: (userId: string, resumeId: string): boolean => {
-    return mockHelpers.userOwnsResume(userId, resumeId);
+  getUserResumes: async (userId: string): Promise<Resume[]> => {
+    return await ResumeRepository.getUserResumes(userId);
+  },
+
+  getResumeListItems: async (resumes: Resume[]): Promise<ResumeListItem[]> => {
+    const listItems = await Promise.all(
+      resumes.map(async (resume) => {
+        const hasAnalysis = await ResumeRepository.hasAnalyses(resume.id);
+        const hasMatch = await ResumeRepository.hasMatches(resume.id);
+
+        return {
+          id: resume.id,
+          fileName: resume.fileName,
+          role: resume.role,
+          createdAt: resume.createdAt,
+          updatedAt: resume.updatedAt,
+          hasAnalysis,
+          hasMatch,
+        };
+      })
+    );
+
+    return listItems;
+  },
+
+  deleteResume: async (resumeId: string): Promise<boolean> => {
+    return await ResumeRepository.deleteResume(resumeId);
+  },
+
+  userOwnsResume: async (userId: string, resumeId: string): Promise<boolean> => {
+    return await ResumeRepository.userOwnsResume(userId, resumeId);
   },
 };
