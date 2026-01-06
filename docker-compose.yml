@@ -18,12 +18,11 @@ services:
     volumes:
       # Mount source code for hot-reload (read-only for safety)
       - ./backend/src:/app/src:ro
-      # Mount environment file if it exists
-      - ./backend/.env:/app/.env:ro
     environment:
       - NODE_ENV=development
       - PORT=3000
       # Database connection (uses service name as hostname)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-resumelint_user}:${POSTGRES_PASSWORD:-resumelint_password}@database:5432/${POSTGRES_DB:-resumelint}?schema=public
       - DATABASE_HOST=database
       - DATABASE_PORT=5432
       - DATABASE_NAME=${POSTGRES_DB:-resumelint}
@@ -80,6 +79,8 @@ services:
   database:
     image: postgres:16-alpine
     container_name: resumelint-database
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
       # PostgreSQL configuration
       POSTGRES_DB: ${POSTGRES_DB:-resumelint}

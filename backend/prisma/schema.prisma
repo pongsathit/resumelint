@@ -1,0 +1,226 @@
+// ResumeLint Database Schema
+// PostgreSQL with Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User Management & Authentication
+// ============================================================================
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  name              String
+  avatar            String
+  subscriptionTier  String   @default("free") // 'free' | 'pro'
+  defaultRole       String?  // Optional: 'Backend Engineer' | 'Frontend Engineer' | etc.
+
+  // Usage tracking (embedded JSON for flexibility)
+  usageCount        Json     @default("{\"analyses\": 0, \"matches\": 0, \"rewrites\": 0}")
+  limits            Json     @default("{\"maxAnalyses\": 1, \"maxMatches\": 0, \"maxRewrites\": 0}")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  resumes           Resume[]
+  refreshTokens     RefreshToken[]
+  accessTokens      AccessToken[]
+  jobDescriptions   JobDescription[]
+
+  @@index([email])
+  @@index([subscriptionTier])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime // 7 days from creation
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model AccessToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime // 1 hour from creation
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("access_tokens")
+}
+
+// ============================================================================
+// Resume Management
+// ============================================================================
+
+model Resume {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fileName        String
+  rawText         String   @db.Text
+  parsedSections  Json     // Flexible JSON for contact, experience, education, skills, projects
+  role            String   // 'Backend Engineer' | 'Frontend Engineer' | etc.
+  status          String   @default("parsed") // 'parsed' | 'processing' | 'error'
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  analyses        Analysis[]
+  matches         Match[]
+  rewrites        Rewrite[]
+  careerGapAnalyses CareerGapAnalysis[]
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("resumes")
+}
+
+// ============================================================================
+// Resume Analysis
+// ============================================================================
+
+model Analysis {
+  id          String   @id @default(uuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  // Scores stored as JSON for flexibility
+  scores      Json     // { overall, clarity, impact, atsFriendliness, technicalDepth }
+  suggestions Json     @db.JsonB // Array of suggestion objects
+  summary     String   @db.Text
+
+  generatedAt DateTime @default(now())
+
+  @@index([resumeId])
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@map("analyses")
+}
+
+// ============================================================================
+// Job Matching
+// ============================================================================
+
+model JobDescription {
+  id        String   @id @default(uuid())
+  userId    String?  // Nullable for anonymous job descriptions
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  rawText   String   @db.Text
+  title     String
+  company   String
+
+  createdAt DateTime @default(now())
+
+  // Relationships
+  matches   Match[]
+
+  @@index([userId])
+  @@map("job_descriptions")
+}
+
+model Match {
+  id                String   @id @default(uuid())
+  resumeId          String
+  resume            Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobDescriptionId  String
+  jobDescription    JobDescription @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+
+  matchScore        Int      // 0-100
+  breakdown         Json     // { keywords, experience, skills, education }
+  missingKeywords   Json     @db.JsonB // Array of missing keyword objects
+  strengths         Json     @db.JsonB // Array of strength objects
+  aiExplanation     Json     @db.JsonB // { summary, whyMismatch, priorityChanges[], improvementTips[] }
+
+  generatedAt       DateTime @default(now())
+
+  @@index([resumeId])
+  @@index([jobDescriptionId])
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@map("matches")
+}
+
+// ============================================================================
+// Resume Rewriting
+// ============================================================================
+
+model Rewrite {
+  id              String   @id @default(uuid())
+  resumeId        String
+  resume          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  originalText    String   @db.Text
+  rewrittenText   String   @db.Text
+  changes         Json     @db.JsonB // Array of change objects
+  scoreImprovement Json    // { before, after, delta }
+  version         Int      @default(1)
+
+  generatedAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([resumeId])
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@map("rewrites")
+}
+
+// ============================================================================
+// Career Development
+// ============================================================================
+
+model CareerGapAnalysis {
+  id          String   @id @default(uuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  currentRole String
+  targetRole  String
+  gaps        Json     @db.JsonB // { technicalSkills[], systemDesign[], leadership[] }
+  strengths   Json     // Array of strength strings
+
+  generatedAt DateTime @default(now())
+
+  // Relationships
+  learningRoadmap LearningRoadmap?
+
+  @@index([resumeId])
+  @@map("career_gap_analyses")
+}
+
+model LearningRoadmap {
+  id                  String   @id @default(uuid())
+  gapAnalysisId       String   @unique
+  careerGapAnalysis   CareerGapAnalysis @relation(fields: [gapAnalysisId], references: [id], onDelete: Cascade)
+
+  timeline            Int      // Days
+  modules             Json     @db.JsonB // Array of module objects with topics
+  estimatedTotalHours Int
+
+  generatedAt         DateTime @default(now())
+
+  @@index([gapAnalysisId])
+  @@map("learning_roadmaps")
+}

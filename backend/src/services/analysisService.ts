@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { analyses, mockHelpers } from '../models/mockData';
+import { AnalysisRepository } from '../repositories';
 import { Analysis, Suggestion, Role } from '../types';
 
 const generateMockSuggestions = (targetRole: Role): Suggestion[] => {
@@ -38,11 +38,11 @@ const generateMockSuggestions = (targetRole: Role): Suggestion[] => {
 };
 
 export const analysisService = {
-  createAnalysis: (resumeId: string, targetRole: Role): Analysis => {
+  createAnalysis: async (resumeId: string, targetRole: Role): Promise<Analysis> => {
     const analysisId = uuidv4();
     const suggestions = generateMockSuggestions(targetRole);
 
-    const analysis: Analysis = {
+    const analysisData = {
       analysisId,
       resumeId,
       scores: {
@@ -54,19 +54,16 @@ export const analysisService = {
       },
       suggestions,
       summary: `Your resume shows strong technical foundation for a ${targetRole} position. Key areas for improvement: quantifying impact with metrics (65% score), adding more context using STAR method, and ensuring ATS compatibility. Your technical depth is solid, but adding specific project outcomes would strengthen your profile.`,
-      generatedAt: new Date().toISOString(),
     };
 
-    analyses.set(analysisId, analysis);
-    return analysis;
+    return await AnalysisRepository.createAnalysis(analysisData);
   },
 
-  getAnalysisById: (analysisId: string): Analysis | null => {
-    return analyses.get(analysisId) || null;
+  getAnalysisById: async (analysisId: string): Promise<Analysis | null> => {
+    return await AnalysisRepository.getAnalysisById(analysisId);
   },
 
-  getLatestResumeAnalysis: (resumeId: string): Analysis | null => {
-    const resumeAnalyses = mockHelpers.getAnalysesByResume(resumeId);
-    return resumeAnalyses.length > 0 ? resumeAnalyses[0] : null;
+  getLatestResumeAnalysis: async (resumeId: string): Promise<Analysis | null> => {
+    return await AnalysisRepository.getLatestAnalysis(resumeId);
   },
 };

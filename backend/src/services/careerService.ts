@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { careerGapAnalyses, learningRoadmaps } from '../models/mockData';
+import { CareerRepository } from '../repositories';
 import { CareerGapAnalysis, LearningRoadmap, Module, Role } from '../types';
 
 const generateMockModules = (): Module[] => {
@@ -153,14 +153,14 @@ const generateMockModules = (): Module[] => {
 };
 
 export const careerService = {
-  createCareerGapAnalysis: (params: {
+  createCareerGapAnalysis: async (params: {
     resumeId: string;
     currentRole: Role;
     targetRole: Role;
-  }): CareerGapAnalysis => {
+  }): Promise<CareerGapAnalysis> => {
     const gapAnalysisId = uuidv4();
 
-    const analysis: CareerGapAnalysis = {
+    return await CareerRepository.createGapAnalysis({
       gapAnalysisId,
       resumeId: params.resumeId,
       currentRole: params.currentRole,
@@ -230,38 +230,30 @@ export const careerService = {
         'Good understanding of database technologies',
         'Team collaboration experience',
       ],
-      generatedAt: new Date().toISOString(),
-    };
-
-    careerGapAnalyses.set(gapAnalysisId, analysis);
-    return analysis;
+    });
   },
 
-  getCareerGapAnalysisById: (gapAnalysisId: string): CareerGapAnalysis | null => {
-    return careerGapAnalyses.get(gapAnalysisId) || null;
+  getCareerGapAnalysisById: async (gapAnalysisId: string): Promise<CareerGapAnalysis | null> => {
+    return await CareerRepository.getGapAnalysisById(gapAnalysisId);
   },
 
-  createLearningRoadmap: (params: { gapAnalysisId: string; timeline?: number }): LearningRoadmap => {
+  createLearningRoadmap: async (params: { gapAnalysisId: string; timeline?: number }): Promise<LearningRoadmap> => {
     const roadmapId = uuidv4();
 
-    const roadmap: LearningRoadmap = {
+    return await CareerRepository.createLearningRoadmap({
       roadmapId,
       gapAnalysisId: params.gapAnalysisId,
       timeline: params.timeline || 30,
       modules: generateMockModules(),
       estimatedTotalHours: 40,
-      generatedAt: new Date().toISOString(),
-    };
-
-    learningRoadmaps.set(roadmapId, roadmap);
-    return roadmap;
+    });
   },
 
-  getLearningRoadmapById: (roadmapId: string): LearningRoadmap | null => {
-    return learningRoadmaps.get(roadmapId) || null;
+  getLearningRoadmapById: async (roadmapId: string): Promise<LearningRoadmap | null> => {
+    return await CareerRepository.getLearningRoadmapById(roadmapId);
   },
 
-  updateRoadmapProgress: (roadmap: LearningRoadmap, moduleId: string, topicId?: string, completed?: boolean) => {
+  updateRoadmapProgress: async (roadmap: LearningRoadmap, moduleId: string, topicId?: string, completed?: boolean) => {
     const module = roadmap.modules.find((m) => m.id === moduleId);
     if (module && topicId) {
       const topic = module.topics.find((t) => t.title === topicId);
@@ -270,6 +262,9 @@ export const careerService = {
       }
       module.completed = module.topics.every((t) => t.completed);
     }
+
+    // Update the roadmap in database
+    await CareerRepository.updateRoadmapModules(roadmap.roadmapId, roadmap.modules);
 
     let completedModules = 0;
     let completedTopics = 0;

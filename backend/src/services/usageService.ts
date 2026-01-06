@@ -1,13 +1,13 @@
-import { mockHelpers } from '../models/mockData';
+import { UserRepository } from '../repositories';
 
 type UsageType = 'analyses' | 'matches' | 'rewrites';
 
 export const usageService = {
-  canPerformAction: (userId: string, type: UsageType): boolean => {
-    return mockHelpers.canPerformAction(userId, type);
+  canPerformAction: async (userId: string, type: UsageType): Promise<boolean> => {
+    return await UserRepository.canPerformAction(userId, type);
   },
 
-  incrementUsage: (userId: string, type: UsageType): void => {
-    mockHelpers.incrementUsage(userId, type);
+  incrementUsage: async (userId: string, type: UsageType): Promise<void> => {
+    await UserRepository.incrementUsage(userId, type);
   },
 };

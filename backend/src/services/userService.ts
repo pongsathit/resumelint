@@ -1,25 +1,12 @@
-import { users } from '../models/mockData';
+import { UserRepository } from '../repositories';
 import { User, Role } from '../types';
 
 export const userService = {
-  getUserById: (userId: string): User | null => {
-    return users.get(userId) || null;
+  getUserById: async (userId: string): Promise<User | null> => {
+    return await UserRepository.getUserById(userId);
   },
 
-  updateUser: (userId: string, updates: { name?: string; defaultRole?: Role }): User | null => {
-    const user = users.get(userId);
-    if (!user) {
-      return null;
-    }
-
-    if (updates.name) {
-      user.name = updates.name;
-    }
-    if (updates.defaultRole) {
-      user.defaultRole = updates.defaultRole;
-    }
-    user.updatedAt = new Date().toISOString();
-
-    return user;
+  updateUser: async (userId: string, updates: { name?: string; defaultRole?: Role }): Promise<User | null> => {
+    return await UserRepository.updateUser(userId, updates);
   },
 };

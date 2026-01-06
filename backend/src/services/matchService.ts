@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { jobDescriptions, matches, mockHelpers } from '../models/mockData';
+import { MatchRepository } from '../repositories';
 import { JobDescription, Match, MissingKeyword, Strength } from '../types';
 
 const generateMockMissingKeywords = (): MissingKeyword[] => {
@@ -48,31 +48,27 @@ const generateMockStrengths = (): Strength[] => {
 };
 
 export const matchService = {
-  createJobDescription: (params: {
+  createJobDescription: async (params: {
     userId?: string;
     rawText: string;
     title?: string;
     company?: string;
-  }): JobDescription => {
+  }): Promise<JobDescription> => {
     const jdId = uuidv4();
 
-    const jobDescription: JobDescription = {
+    return await MatchRepository.createJobDescription({
       id: jdId,
       userId: params.userId,
       rawText: params.rawText,
       title: params.title || 'Software Engineer',
       company: params.company || 'Tech Company',
-      createdAt: new Date().toISOString(),
-    };
-
-    jobDescriptions.set(jdId, jobDescription);
-    return jobDescription;
+    });
   },
 
-  createMatch: (resumeId: string, jobDescriptionId: string): Match => {
+  createMatch: async (resumeId: string, jobDescriptionId: string): Promise<Match> => {
     const matchId = uuidv4();
 
-    const match: Match = {
+    return await MatchRepository.createMatch({
       matchId,
       resumeId,
       jobDescriptionId,
@@ -100,22 +96,18 @@ export const matchService = {
           'Align your technical skills section with the job requirements',
         ],
       },
-      generatedAt: new Date().toISOString(),
-    };
-
-    matches.set(matchId, match);
-    return match;
+    });
   },
 
-  getMatchById: (matchId: string): Match | null => {
-    return matches.get(matchId) || null;
+  getMatchById: async (matchId: string): Promise<Match | null> => {
+    return await MatchRepository.getMatchById(matchId);
   },
 
-  getResumeMatches: (resumeId: string): Match[] => {
-    return mockHelpers.getMatchesByResume(resumeId);
+  getResumeMatches: async (resumeId: string): Promise<Match[]> => {
+    return await MatchRepository.getResumeMatches(resumeId);
   },
 
-  getJobDescriptionById: (jdId: string): JobDescription | null => {
-    return jobDescriptions.get(jdId) || null;
+  getJobDescriptionById: async (jdId: string): Promise<JobDescription | null> => {
+    return await MatchRepository.getJobDescriptionById(jdId);
   },
 };
