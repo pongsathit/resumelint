@@ -8,7 +8,7 @@ import { RATE_LIMIT } from '../constants/validation';
 import { Role } from '../types';
 
 export const analysisController = {
-  analyzeResume: (req: Request, res: Response) => {
+  analyzeResume: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -31,11 +31,19 @@ export const analysisController = {
     }
 
     const targetRole = (role || resume.role) as Role;
-    const analysis = analysisService.createAnalysis(id, targetRole);
 
-    usageService.incrementUsage(req.user.id, 'analyses');
-
-    res.json(analysis);
+    try {
+      const analysis = await analysisService.createAnalysis(id, targetRole);
+      usageService.incrementUsage(req.user.id, 'analyses');
+      res.json(analysis);
+    } catch (error: any) {
+      console.error('Analysis controller error:', error.message);
+      return res.status(503).json({
+        error: 'ai_service_unavailable',
+        message: 'AI analysis is temporarily unavailable. Please try again later.',
+        details: error.message,
+      });
+    }
   },
 
   getLatestAnalysis: (req: Request, res: Response) => {

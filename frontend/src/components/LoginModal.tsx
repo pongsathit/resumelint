@@ -38,7 +38,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       await login({
         provider: 'email',
         email: demoEmail,
-        password: 'demo',
+        password: 'john.doe@example.com' === demoEmail ? 'password123' : 'propassword456',
       })
       onClose()
     } catch (err) {

@@ -15,6 +15,7 @@ const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ==================== Authentication Routes ====================
+router.post('/api/auth/register', authController.register);
 router.post('/api/auth/login', authController.login);
 router.post('/api/auth/refresh', authController.refresh);
 router.post('/api/auth/logout', authMiddleware, authController.logout);

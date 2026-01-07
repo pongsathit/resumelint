@@ -1,6 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { analyses, mockHelpers } from '../models/mockData';
 import { Analysis, Suggestion, Role } from '../types';
+import { AI_CONFIG } from '../config/ai';
+import { openaiService } from './ai/openaiService';
+import { parseAnalysisResponse } from './ai/parsers/analysisParser';
+import { aiCache } from './ai/cache/cacheService';
+import { resumeService } from './resumeService';
 
 const generateMockSuggestions = (targetRole: Role): Suggestion[] => {
   return [
@@ -38,7 +43,54 @@ const generateMockSuggestions = (targetRole: Role): Suggestion[] => {
 };
 
 export const analysisService = {
-  createAnalysis: (resumeId: string, targetRole: Role): Analysis => {
+  /**
+   * Create a resume analysis using AI or mock data
+   * @param resumeId ID of the resume to analyze
+   * @param targetRole Target role for analysis
+   * @returns Analysis object with scores and suggestions
+   */
+  createAnalysis: async (resumeId: string, targetRole: Role): Promise<Analysis> => {
+    const resume = resumeService.getResumeById(resumeId);
+    if (!resume) {
+      throw new Error('Resume not found');
+    }
+
+    // Use AI if enabled
+    if (AI_CONFIG.enabled) {
+      try {
+        // Check cache first
+        const cacheKey = aiCache.generateKey(resume.rawText, targetRole);
+        const cachedAnalysis = aiCache.get(cacheKey);
+
+        if (cachedAnalysis) {
+          console.log(`✓ Cache hit for analysis: ${resumeId}`);
+          return cachedAnalysis;
+        }
+
+        console.log(`→ Calling OpenAI API for analysis: ${resumeId}`);
+
+        // Call OpenAI API
+        const aiResponse = await openaiService.analyzeResume(resume.rawText, targetRole);
+
+        // Parse and validate response
+        const analysis = parseAnalysisResponse(aiResponse, resumeId);
+
+        // Store in cache and in-memory map
+        aiCache.set(cacheKey, analysis);
+        analyses.set(analysis.analysisId, analysis);
+
+        console.log(`✓ AI analysis completed: ${analysis.analysisId}`);
+
+        return analysis;
+      } catch (error: any) {
+        console.error('AI analysis failed:', error.message);
+        // Re-throw error to be handled by controller
+        throw error;
+      }
+    }
+
+    // Fallback to mock implementation when AI is disabled
+    console.log(`→ Using mock analysis (AI disabled): ${resumeId}`);
     const analysisId = uuidv4();
     const suggestions = generateMockSuggestions(targetRole);
 

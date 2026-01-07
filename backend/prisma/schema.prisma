@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(uuid())
+  email            String             @unique
+  password         String?            @db.VarChar(255) // Optional: bcrypt hashed password (only for email auth), nullable for OAuth users
+  name             String
+  avatar           String
+  subscriptionTier String             @default("free")
+  defaultRole      String?
+  usageCount       Json               @default("{\"matches\": 0, \"analyses\": 0, \"rewrites\": 0}")
+  limits           Json               @default("{\"maxMatches\": 0, \"maxAnalyses\": 1, \"maxRewrites\": 0}")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  access_tokens    access_tokens[]
+  job_descriptions job_descriptions[]
+  refreshTokens    RefreshToken[]
+  resumes          Resume[]
+
+  @@index([email])
+  @@index([subscriptionTier])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Resume {
+  id                  String                @id @default(uuid())
+  userId              String
+  fileName            String
+  rawText             String
+  parsedSections      Json
+  role                String
+  status              String                @default("parsed")
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  analyses            analyses[]
+  career_gap_analyses career_gap_analyses[]
+  matches             matches[]
+  user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewrites            rewrites[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("resumes")
+}
+
+model access_tokens {
+  id        String   @id
+  token     String   @unique
+  userId    String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([token])
+  @@index([userId])
+}
+
+model analyses {
+  id          String   @id
+  resumeId    String
+  scores      Json
+  suggestions Json
+  summary     String
+  generatedAt DateTime @default(now())
+  resumes     Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@index([resumeId])
+}
+
+model career_gap_analyses {
+  id                String             @id
+  resumeId          String
+  currentRole       String
+  targetRole        String
+  gaps              Json
+  strengths         Json
+  generatedAt       DateTime           @default(now())
+  resumes           Resume             @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  learning_roadmaps learning_roadmaps?
+
+  @@index([resumeId])
+}
+
+model job_descriptions {
+  id        String    @id
+  userId    String?
+  rawText   String
+  title     String
+  company   String
+  createdAt DateTime  @default(now())
+  users     User?     @relation(fields: [userId], references: [id])
+  matches   matches[]
+
+  @@index([userId])
+}
+
+model learning_roadmaps {
+  id                  String              @id
+  gapAnalysisId       String              @unique
+  timeline            Int
+  modules             Json
+  estimatedTotalHours Int
+  generatedAt         DateTime            @default(now())
+  career_gap_analyses career_gap_analyses @relation(fields: [gapAnalysisId], references: [id], onDelete: Cascade)
+
+  @@index([gapAnalysisId])
+}
+
+model matches {
+  id               String           @id
+  resumeId         String
+  jobDescriptionId String
+  matchScore       Int
+  breakdown        Json
+  missingKeywords  Json
+  strengths        Json
+  aiExplanation    Json
+  generatedAt      DateTime         @default(now())
+  job_descriptions job_descriptions @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+  resumes          Resume           @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([jobDescriptionId])
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@index([resumeId])
+}
+
+model rewrites {
+  id               String   @id
+  resumeId         String
+  originalText     String
+  rewrittenText    String
+  changes          Json
+  scoreImprovement Json
+  version          Int      @default(1)
+  generatedAt      DateTime @default(now())
+  updatedAt        DateTime
+  resumes          Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId, generatedAt(sort: Desc)])
+  @@index([resumeId])
+}
