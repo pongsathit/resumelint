@@ -28,44 +28,12 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    depends_on:
-      database:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
       timeout: 5s
       start_period: 20s
       retries: 3
-    restart: unless-stopped
-
-  # ----------------------------------------------------------------------------
-  # Database Service - PostgreSQL for persistent data storage
-  # ----------------------------------------------------------------------------
-  database:
-    image: postgres:16-alpine
-    container_name: resumelint-database
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    environment:
-      # PostgreSQL configuration
-      POSTGRES_DB: ${POSTGRES_DB:-resumelint}
-      POSTGRES_USER: ${POSTGRES_USER:-resumelint_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-resumelint_password}
-      # Performance tuning for development
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
-    volumes:
-      # Persistent data storage using named volume
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - resumelint-network
-    healthcheck:
-      # Check if PostgreSQL is ready to accept connections
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resumelint_user} -d ${POSTGRES_DB:-resumelint}"]
-      interval: 10s
-      timeout: 5s
-      start_period: 30s
-      retries: 5
     restart: unless-stopped
 
   # ----------------------------------------------------------------------------
@@ -141,17 +109,6 @@ networks:
   resumelint-network:
     driver: bridge
     name: resumelint-network
-
-# ------------------------------------------------------------------------------
-# Volumes - Persistent data storage
-# ------------------------------------------------------------------------------
-volumes:
-  # PostgreSQL data persistence
-  # Data survives container restarts and removals
-  # To reset database: docker-compose down -v
-  postgres_data:
-    driver: local
-    name: resumelint_postgres_data
 
 # ------------------------------------------------------------------------------
 # Volumes - Persistent data storage
