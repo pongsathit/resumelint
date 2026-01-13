@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { CareerGapAnalysis, LearningRoadmap, Module, Role } from '../types';
 import { prisma } from '../utils/prisma';
+import { CareerRepository } from '../repositories/CareerRepository';
 
 const generateMockModules = (): Module[] => {
   return [
@@ -332,7 +333,7 @@ export const careerService = {
     }
   },
 
-  updateRoadmapProgress: (roadmap: LearningRoadmap, moduleId: string, topicId?: string, completed?: boolean) => {
+  updateRoadmapProgress: async (roadmap: LearningRoadmap, moduleId: string, topicId?: string, completed?: boolean) => {
     const module = roadmap.modules.find((m) => m.id === moduleId);
     if (module && topicId) {
       const topic = module.topics.find((t) => t.title === topicId);
@@ -341,6 +342,9 @@ export const careerService = {
       }
       module.completed = module.topics.every((t) => t.completed);
     }
+
+    // Update the roadmap in database
+    await CareerRepository.updateRoadmapModules(roadmap.roadmapId, roadmap.modules);
 
     let completedModules = 0;
     let completedTopics = 0;

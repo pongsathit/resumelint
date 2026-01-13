@@ -1,0 +1,259 @@
+-- ==============================================================================
+-- PostgreSQL Initialization Script (Example)
+-- ==============================================================================
+-- This file is executed when the database container is first created.
+-- To use it, rename to init.sql and uncomment the volume mount in docker-compose.yml
+--
+-- IMPORTANT: This script only runs on FIRST container creation when the
+-- postgres_data volume is empty. To re-run, you must remove the volume first:
+--   docker-compose down
+--   docker volume rm resumelint_postgres_data
+--   docker-compose up -d
+-- ==============================================================================
+
+-- Set timezone to UTC for consistency
+SET timezone = 'UTC';
+
+-- ==============================================================================
+-- SCHEMA CREATION
+-- ==============================================================================
+-- Example schema based on the ResumeLint data model
+-- Modify according to your ORM/migration strategy
+
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(255) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    avatar VARCHAR(500),
+    subscription_tier VARCHAR(50) DEFAULT 'free' CHECK (subscription_tier IN ('free', 'pro')),
+    default_role VARCHAR(100),
+    usage_analyses INTEGER DEFAULT 0,
+    usage_matches INTEGER DEFAULT 0,
+    usage_rewrites INTEGER DEFAULT 0,
+    limit_analyses INTEGER DEFAULT 1,
+    limit_matches INTEGER DEFAULT 0,
+    limit_rewrites INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Auth tokens table
+CREATE TABLE IF NOT EXISTS auth_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_type VARCHAR(50) NOT NULL CHECK (token_type IN ('access', 'refresh')),
+    token VARCHAR(500) UNIQUE NOT NULL,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    revoked_at TIMESTAMP
+);
+
+-- Resumes table
+CREATE TABLE IF NOT EXISTS resumes (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_name VARCHAR(500) NOT NULL,
+    raw_text TEXT NOT NULL,
+    parsed_sections JSONB,
+    role VARCHAR(100) NOT NULL,
+    status VARCHAR(50) DEFAULT 'parsed' CHECK (status IN ('parsed', 'processing', 'error')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Analyses table
+CREATE TABLE IF NOT EXISTS analyses (
+    id VARCHAR(255) PRIMARY KEY,
+    resume_id VARCHAR(255) NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    score_overall NUMERIC(5,2),
+    score_clarity NUMERIC(5,2),
+    score_impact NUMERIC(5,2),
+    score_ats NUMERIC(5,2),
+    score_technical NUMERIC(5,2),
+    suggestions JSONB,
+    summary TEXT,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Job descriptions table
+CREATE TABLE IF NOT EXISTS job_descriptions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id VARCHAR(255) REFERENCES users(id) ON DELETE SET NULL,
+    raw_text TEXT NOT NULL,
+    title VARCHAR(500),
+    company VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Matches table
+CREATE TABLE IF NOT EXISTS matches (
+    id VARCHAR(255) PRIMARY KEY,
+    resume_id VARCHAR(255) NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    job_description_id VARCHAR(255) NOT NULL REFERENCES job_descriptions(id) ON DELETE CASCADE,
+    match_score NUMERIC(5,2),
+    breakdown JSONB,
+    missing_keywords JSONB,
+    strengths JSONB,
+    ai_explanation JSONB,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rewrites table
+CREATE TABLE IF NOT EXISTS rewrites (
+    id VARCHAR(255) PRIMARY KEY,
+    resume_id VARCHAR(255) NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    original_text TEXT NOT NULL,
+    rewritten_text TEXT NOT NULL,
+    changes JSONB,
+    score_before NUMERIC(5,2),
+    score_after NUMERIC(5,2),
+    score_delta NUMERIC(5,2),
+    version INTEGER DEFAULT 1,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Career gap analyses table
+CREATE TABLE IF NOT EXISTS career_gap_analyses (
+    id VARCHAR(255) PRIMARY KEY,
+    resume_id VARCHAR(255) NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    current_role VARCHAR(100),
+    target_role VARCHAR(100),
+    gaps JSONB,
+    strengths JSONB,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Learning roadmaps table
+CREATE TABLE IF NOT EXISTS learning_roadmaps (
+    id VARCHAR(255) PRIMARY KEY,
+    gap_analysis_id VARCHAR(255) NOT NULL REFERENCES career_gap_analyses(id) ON DELETE CASCADE,
+    timeline INTEGER,
+    modules JSONB,
+    estimated_total_hours INTEGER,
+    generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- INDEXES
+-- ==============================================================================
+-- Optimize common queries
+
+-- User lookups
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_subscription ON users(subscription_tier);
+
+-- Token lookups
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_user_id ON auth_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_token ON auth_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_auth_tokens_type ON auth_tokens(token_type);
+
+-- Resume queries
+CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON resumes(user_id);
+CREATE INDEX IF NOT EXISTS idx_resumes_created_at ON resumes(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_resumes_status ON resumes(status);
+
+-- Analysis queries
+CREATE INDEX IF NOT EXISTS idx_analyses_resume_id ON analyses(resume_id);
+CREATE INDEX IF NOT EXISTS idx_analyses_generated_at ON analyses(generated_at DESC);
+
+-- Job description queries
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_user_id ON job_descriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_job_descriptions_created_at ON job_descriptions(created_at DESC);
+
+-- Match queries
+CREATE INDEX IF NOT EXISTS idx_matches_resume_id ON matches(resume_id);
+CREATE INDEX IF NOT EXISTS idx_matches_job_description_id ON matches(job_description_id);
+CREATE INDEX IF NOT EXISTS idx_matches_generated_at ON matches(generated_at DESC);
+
+-- Rewrite queries
+CREATE INDEX IF NOT EXISTS idx_rewrites_resume_id ON rewrites(resume_id);
+CREATE INDEX IF NOT EXISTS idx_rewrites_version ON rewrites(version);
+CREATE INDEX IF NOT EXISTS idx_rewrites_generated_at ON rewrites(generated_at DESC);
+
+-- Career gap queries
+CREATE INDEX IF NOT EXISTS idx_career_gap_analyses_resume_id ON career_gap_analyses(resume_id);
+
+-- Learning roadmap queries
+CREATE INDEX IF NOT EXISTS idx_learning_roadmaps_gap_analysis_id ON learning_roadmaps(gap_analysis_id);
+
+-- ==============================================================================
+-- FUNCTIONS & TRIGGERS
+-- ==============================================================================
+
+-- Function to automatically update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply updated_at trigger to relevant tables
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_resumes_updated_at BEFORE UPDATE ON resumes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_rewrites_updated_at BEFORE UPDATE ON rewrites
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ==============================================================================
+-- SEED DATA (Optional)
+-- ==============================================================================
+-- Insert some sample data for development/testing
+
+-- Sample users
+INSERT INTO users (id, email, name, avatar, subscription_tier, default_role, limit_analyses, limit_matches, limit_rewrites)
+VALUES
+    ('user-1', 'john.doe@example.com', 'John Doe', 'https://i.pravatar.cc/150?img=1', 'free', 'Backend Engineer', 1, 0, 0),
+    ('user-2', 'jane.smith@example.com', 'Jane Smith', 'https://i.pravatar.cc/150?img=2', 'pro', 'Fullstack Developer', 999999, 999999, 999999)
+ON CONFLICT (id) DO NOTHING;
+
+-- Sample auth tokens
+INSERT INTO auth_tokens (user_id, token_type, token)
+VALUES
+    ('user-1', 'refresh', 'refresh-token-1'),
+    ('user-1', 'access', 'access-token-1'),
+    ('user-2', 'refresh', 'refresh-token-2'),
+    ('user-2', 'access', 'access-token-2')
+ON CONFLICT (token) DO NOTHING;
+
+-- ==============================================================================
+-- PERMISSIONS (Optional)
+-- ==============================================================================
+-- Grant appropriate permissions to the application user
+
+-- The POSTGRES_USER already has full permissions on the database
+-- If you create additional users, grant permissions here:
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO resumelint_user;
+-- GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO resumelint_user;
+
+-- ==============================================================================
+-- EXTENSIONS (Optional)
+-- ==============================================================================
+-- Enable useful PostgreSQL extensions
+
+-- UUID generation (if you want to generate UUIDs in the database)
+-- CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Full-text search (for resume text search)
+-- CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- Query performance monitoring
+-- CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+
+-- ==============================================================================
+-- COMPLETION MESSAGE
+-- ==============================================================================
+DO $$
+BEGIN
+    RAISE NOTICE '✓ Database initialization complete!';
+    RAISE NOTICE '  - Tables created';
+    RAISE NOTICE '  - Indexes created';
+    RAISE NOTICE '  - Triggers configured';
+    RAISE NOTICE '  - Sample data inserted';
+END $$;

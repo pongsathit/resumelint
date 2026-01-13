@@ -105,7 +105,7 @@ export const analysisService = {
     const analysisId = uuidv4();
     const suggestions = generateMockSuggestions(targetRole);
 
-    const analysis: Analysis = {
+    const analysisData = {
       analysisId,
       resumeId,
       scores: {
@@ -117,7 +117,6 @@ export const analysisService = {
       },
       suggestions,
       summary: `Your resume shows strong technical foundation for a ${targetRole} position. Key areas for improvement: quantifying impact with metrics (65% score), adding more context using STAR method, and ensuring ATS compatibility. Your technical depth is solid, but adding specific project outcomes would strengthen your profile.`,
-      generatedAt: new Date().toISOString(),
     };
 
     // Save mock analysis to database as well
