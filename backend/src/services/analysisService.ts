@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-import { analyses, mockHelpers } from '../models/mockData';
 import { Analysis, Suggestion, Role } from '../types';
 import { AI_CONFIG } from '../config/ai';
 import { openaiService } from './ai/openaiService';
 import { parseAnalysisResponse } from './ai/parsers/analysisParser';
 import { aiCache } from './ai/cache/cacheService';
 import { resumeService } from './resumeService';
+import { prisma } from '../utils/prisma';
 
 const generateMockSuggestions = (targetRole: Role): Suggestion[] => {
   return [
@@ -50,7 +50,7 @@ export const analysisService = {
    * @returns Analysis object with scores and suggestions
    */
   createAnalysis: async (resumeId: string, targetRole: Role): Promise<Analysis> => {
-    const resume = resumeService.getResumeById(resumeId);
+    const resume = await resumeService.getResumeById(resumeId);
     if (!resume) {
       throw new Error('Resume not found');
     }
@@ -75,11 +75,22 @@ export const analysisService = {
         // Parse and validate response
         const analysis = parseAnalysisResponse(aiResponse, resumeId);
 
-        // Store in cache and in-memory map
+        // Store in cache
         aiCache.set(cacheKey, analysis);
-        analyses.set(analysis.analysisId, analysis);
 
-        console.log(`✓ AI analysis completed: ${analysis.analysisId}`);
+        // Save to database using Prisma
+        await prisma.analyses.create({
+          data: {
+            id: analysis.analysisId,
+            resumeId: analysis.resumeId,
+            scores: analysis.scores as any,
+            suggestions: analysis.suggestions as any,
+            summary: analysis.summary,
+            generatedAt: new Date(analysis.generatedAt),
+          },
+        });
+
+        console.log(`✓ AI analysis completed and saved to database: ${analysis.analysisId}`);
 
         return analysis;
       } catch (error: any) {
@@ -109,16 +120,69 @@ export const analysisService = {
       generatedAt: new Date().toISOString(),
     };
 
-    analyses.set(analysisId, analysis);
+    // Save mock analysis to database as well
+    await prisma.analyses.create({
+      data: {
+        id: analysisId,
+        resumeId,
+        scores: analysis.scores as any,
+        suggestions: analysis.suggestions as any,
+        summary: analysis.summary,
+        generatedAt: new Date(analysis.generatedAt),
+      },
+    });
+
+    console.log(`✓ Mock analysis saved to database: ${analysisId}`);
+
     return analysis;
   },
 
-  getAnalysisById: (analysisId: string): Analysis | null => {
-    return analyses.get(analysisId) || null;
+  getAnalysisById: async (analysisId: string): Promise<Analysis | null> => {
+    try {
+      const dbAnalysis = await prisma.analyses.findUnique({
+        where: { id: analysisId },
+      });
+
+      if (!dbAnalysis) {
+        return null;
+      }
+
+      return {
+        analysisId: dbAnalysis.id,
+        resumeId: dbAnalysis.resumeId,
+        scores: dbAnalysis.scores as unknown as Analysis['scores'],
+        suggestions: dbAnalysis.suggestions as unknown as Suggestion[],
+        summary: dbAnalysis.summary,
+        generatedAt: dbAnalysis.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching analysis by ID:', error);
+      return null;
+    }
   },
 
-  getLatestResumeAnalysis: (resumeId: string): Analysis | null => {
-    const resumeAnalyses = mockHelpers.getAnalysesByResume(resumeId);
-    return resumeAnalyses.length > 0 ? resumeAnalyses[0] : null;
+  getLatestResumeAnalysis: async (resumeId: string): Promise<Analysis | null> => {
+    try {
+      const dbAnalysis = await prisma.analyses.findFirst({
+        where: { resumeId },
+        orderBy: { generatedAt: 'desc' },
+      });
+
+      if (!dbAnalysis) {
+        return null;
+      }
+
+      return {
+        analysisId: dbAnalysis.id,
+        resumeId: dbAnalysis.resumeId,
+        scores: dbAnalysis.scores as unknown as Analysis['scores'],
+        suggestions: dbAnalysis.suggestions as unknown as Suggestion[],
+        summary: dbAnalysis.summary,
+        generatedAt: dbAnalysis.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching latest resume analysis:', error);
+      return null;
+    }
   },
 };

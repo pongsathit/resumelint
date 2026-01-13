@@ -28,6 +28,8 @@ export default function ErrorMessage({
         return 'Validation Error';
       case 'rate_limit_exceeded':
         return 'Rate Limit Exceeded';
+      case 'ai_service_unavailable':
+        return 'AI Service Unavailable';
       case 'internal_error':
         return 'Server Error';
       default:
@@ -46,6 +48,8 @@ export default function ErrorMessage({
         return 'warning';
       case 'rate_limit_exceeded':
         return 'hourglass_empty';
+      case 'ai_service_unavailable':
+        return 'cloud_off';
       case 'internal_error':
         return 'error';
       default:
