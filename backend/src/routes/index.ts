@@ -12,9 +12,32 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth';
 import multer from 'multer';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
+
+// Configure multer for resume file uploads
+const upload = multer({
+  storage: multer.memoryStorage(), // Store in memory for parsing
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allowed MIME types for resume files
+    const allowedMimeTypes = [
+      'application/pdf', // PDF
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+      'application/msword', // DOC
+      'text/plain', // TXT
+    ];
+
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Invalid file type: ${file.mimetype}. Please upload PDF, DOCX, DOC, or TXT files.`));
+    }
+  },
+});
 
 // ==================== Authentication Routes ====================
+router.post('/api/auth/register', authController.register);
 router.post('/api/auth/login', authController.login);
 router.post('/api/auth/refresh', authController.refresh);
 router.post('/api/auth/logout', authMiddleware, authController.logout);

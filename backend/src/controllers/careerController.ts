@@ -5,7 +5,7 @@ import { sendUnauthorized, sendNotFound, sendForbidden } from '../utils/errors';
 import { ERROR_MESSAGES } from '../constants/errors';
 
 export const careerController = {
-  analyzeCareerGap: (req: Request, res: Response) => {
+  analyzeCareerGap: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -15,17 +15,17 @@ export const careerController = {
     }
 
     const { resumeId, currentRole, targetRole } = req.body;
-    const resume = resumeService.getResumeById(resumeId);
+    const resume = await resumeService.getResumeById(resumeId);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const analysis = careerService.createCareerGapAnalysis({
+    const analysis = await careerService.createCareerGapAnalysis({
       resumeId,
       currentRole,
       targetRole,
@@ -34,7 +34,7 @@ export const careerController = {
     res.json(analysis);
   },
 
-  getCareerGapAnalysis: (req: Request, res: Response) => {
+  getCareerGapAnalysis: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -44,20 +44,20 @@ export const careerController = {
     }
 
     const { gapAnalysisId } = req.params;
-    const analysis = careerService.getCareerGapAnalysisById(gapAnalysisId);
+    const analysis = await careerService.getCareerGapAnalysisById(gapAnalysisId);
 
     if (!analysis) {
       return sendNotFound(res, ERROR_MESSAGES.CAREER_GAP_ANALYSIS_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, analysis.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, analysis.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
     res.json(analysis);
   },
 
-  createLearningRoadmap: (req: Request, res: Response) => {
+  createLearningRoadmap: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -67,17 +67,17 @@ export const careerController = {
     }
 
     const { gapAnalysisId, timeline } = req.body;
-    const analysis = careerService.getCareerGapAnalysisById(gapAnalysisId);
+    const analysis = await careerService.getCareerGapAnalysisById(gapAnalysisId);
 
     if (!analysis) {
       return sendNotFound(res, ERROR_MESSAGES.CAREER_GAP_ANALYSIS_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, analysis.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, analysis.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const roadmap = careerService.createLearningRoadmap({
+    const roadmap = await careerService.createLearningRoadmap({
       gapAnalysisId,
       timeline,
     });
@@ -85,7 +85,7 @@ export const careerController = {
     res.json(roadmap);
   },
 
-  getLearningRoadmap: (req: Request, res: Response) => {
+  getLearningRoadmap: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -95,21 +95,21 @@ export const careerController = {
     }
 
     const { roadmapId } = req.params;
-    const roadmap = careerService.getLearningRoadmapById(roadmapId);
+    const roadmap = await careerService.getLearningRoadmapById(roadmapId);
 
     if (!roadmap) {
       return sendNotFound(res, ERROR_MESSAGES.LEARNING_ROADMAP_NOT_FOUND);
     }
 
-    const analysis = careerService.getCareerGapAnalysisById(roadmap.gapAnalysisId);
-    if (!analysis || !resumeService.userOwnsResume(req.user.id, analysis.resumeId)) {
+    const analysis = await careerService.getCareerGapAnalysisById(roadmap.gapAnalysisId);
+    if (!analysis || !(await resumeService.userOwnsResume(req.user.id, analysis.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
     res.json(roadmap);
   },
 
-  updateProgress: (req: Request, res: Response) => {
+  updateProgress: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -121,14 +121,14 @@ export const careerController = {
     const { roadmapId } = req.params;
     const { moduleId, topicId, completed } = req.body;
 
-    const roadmap = careerService.getLearningRoadmapById(roadmapId);
+    const roadmap = await careerService.getLearningRoadmapById(roadmapId);
 
     if (!roadmap) {
       return sendNotFound(res, ERROR_MESSAGES.LEARNING_ROADMAP_NOT_FOUND);
     }
 
-    const analysis = careerService.getCareerGapAnalysisById(roadmap.gapAnalysisId);
-    if (!analysis || !resumeService.userOwnsResume(req.user.id, analysis.resumeId)) {
+    const analysis = await careerService.getCareerGapAnalysisById(roadmap.gapAnalysisId);
+    if (!analysis || !(await resumeService.userOwnsResume(req.user.id, analysis.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 

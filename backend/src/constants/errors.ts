@@ -23,4 +23,10 @@ export const ERROR_MESSAGES = {
   NO_ANALYSIS_FOUND: 'No analysis found for this resume',
   RATE_LIMIT: 'Usage limit reached. Please upgrade to Pro.',
   PRO_REQUIRED: 'This feature requires Pro tier subscription',
+  // AI-related errors
+  AI_SERVICE_UNAVAILABLE: 'AI analysis is temporarily unavailable',
+  AI_PARSE_ERROR: 'Failed to parse AI response',
+  AI_TIMEOUT: 'AI request timed out',
+  AI_RATE_LIMIT: 'OpenAI rate limit exceeded',
+  AI_AUTH_ERROR: 'OpenAI authentication failed',
 } as const;

@@ -7,42 +7,86 @@ import { PAGINATION_DEFAULTS } from '../constants/validation';
 import { Role } from '../types';
 
 export const resumeController = {
-  create: (req: Request, res: Response) => {
-    const { text, role } = req.body;
-    const file = req.file;
+  create: async (req: Request, res: Response) => {
+    try {
+      const { text, role } = req.body;
+      const file = req.file;
 
-    const roleValidation = validateRole(role);
-    if (!roleValidation.isValid) {
-      return sendValidationError(res, 'Invalid or missing role', roleValidation.details);
+      const roleValidation = validateRole(role);
+      if (!roleValidation.isValid) {
+        return sendValidationError(res, 'Invalid or missing role', roleValidation.details);
+      }
+
+      // Validate that either file or text is provided
+      if (!file && !text) {
+        return sendValidationError(res, 'Either file or text is required', [
+          { field: 'file/text', message: 'Either file or text must be provided' },
+        ]);
+      }
+
+      const userId = req.user?.id || 'anonymous';
+      let fileName = 'pasted-text.txt';
+      let fileBuffer: Buffer | undefined = undefined;
+      let rawText: string | undefined = undefined;
+
+      if (file) {
+        // File upload case
+        fileName = file.originalname;
+        fileBuffer = file.buffer;
+      } else if (text) {
+        // Text paste case
+        fileName = 'pasted-text.txt';
+        rawText = text;
+      }
+
+      const resume = await resumeService.createResume({
+        userId,
+        fileName,
+        role: role as Role,
+        fileBuffer,
+        rawText,
+      });
+
+      res.json(resume);
+    } catch (error) {
+      console.error('Error in resume creation:', error);
+
+      if (error instanceof Error) {
+        // Handle specific parsing errors with clear user-facing messages
+        if (error.message.includes('Unsupported file type')) {
+          return sendValidationError(res, error.message);
+        }
+        if (error.message.includes('PDF') || error.message.includes('DOCX')) {
+          return res.status(400).json({
+            error: 'parse_error',
+            message: 'Failed to parse resume file. Please ensure it is a valid PDF, DOCX, DOC, or TXT file.',
+            details: error.message,
+          });
+        }
+        if (error.message.includes('empty')) {
+          return res.status(400).json({
+            error: 'validation_error',
+            message: error.message,
+          });
+        }
+
+        // Generic error
+        return res.status(500).json({
+          error: 'server_error',
+          message: 'Failed to create resume. Please try again.',
+          details: error.message,
+        });
+      }
+
+      // Unknown error type
+      return res.status(500).json({
+        error: 'server_error',
+        message: 'An unexpected error occurred while creating the resume.',
+      });
     }
-
-    let rawText = '';
-    let fileName = '';
-
-    if (file) {
-      fileName = file.originalname;
-      rawText = `Mock parsed content from ${fileName}\n\nJohn Doe\nSoftware Engineer\n\nExperience:\n- Senior Backend Engineer at Tech Corp (2020-2024)\n- Built scalable microservices handling 1M+ requests/day\n- Led team of 5 engineers\n\nSkills:\nNode.js, TypeScript, PostgreSQL, Docker, Kubernetes`;
-    } else if (text) {
-      fileName = 'resume.txt';
-      rawText = text;
-    } else {
-      return sendValidationError(res, 'Either file or text is required', [
-        { field: 'file/text', message: 'Either file or text must be provided' },
-      ]);
-    }
-
-    const userId = req.user?.id || 'anonymous';
-    const resume = resumeService.createResume({
-      userId,
-      rawText,
-      fileName,
-      role: role as Role,
-    });
-
-    res.json(resume);
   },
 
-  list: (req: Request, res: Response) => {
+  list: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -50,13 +94,13 @@ export const resumeController = {
     const page = parseInt(req.query.page as string) || PAGINATION_DEFAULTS.PAGE;
     const limit = parseInt(req.query.limit as string) || PAGINATION_DEFAULTS.LIMIT;
 
-    const userResumes = resumeService.getUserResumes(req.user.id);
+    const userResumes = await resumeService.getUserResumes(req.user.id);
 
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedResumes = userResumes.slice(startIndex, endIndex);
 
-    const resumeList = resumeService.getResumeListItems(paginatedResumes);
+    const resumeList = await resumeService.getResumeListItems(paginatedResumes);
 
     res.json({
       resumes: resumeList,
@@ -69,42 +113,42 @@ export const resumeController = {
     });
   },
 
-  getById: (req: Request, res: Response) => {
+  getById: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const resume = resumeService.getResumeById(id);
+    const resume = await resumeService.getResumeById(id);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, id)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, id))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
     res.json(resume);
   },
 
-  delete: (req: Request, res: Response) => {
+  delete: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const resume = resumeService.getResumeById(id);
+    const resume = await resumeService.getResumeById(id);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, id)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, id))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    resumeService.deleteResume(id);
+    await resumeService.deleteResume(id);
 
     res.json({
       success: true,

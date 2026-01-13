@@ -7,33 +7,33 @@ import { ERROR_MESSAGES } from '../constants/errors';
 import { RATE_LIMIT } from '../constants/validation';
 
 export const rewriteController = {
-  rewriteResume: (req: Request, res: Response) => {
+  rewriteResume: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const resume = resumeService.getResumeById(id);
+    const resume = await resumeService.getResumeById(id);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, id)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, id))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    if (!usageService.canPerformAction(req.user.id, 'rewrites')) {
+    if (!(await usageService.canPerformAction(req.user.id, 'rewrites'))) {
       return sendRateLimitError(res, ERROR_MESSAGES.RATE_LIMIT, RATE_LIMIT.RETRY_AFTER);
     }
 
-    const rewrite = rewriteService.createRewrite(id, resume.rawText);
-    usageService.incrementUsage(req.user.id, 'rewrites');
+    const rewrite = await rewriteService.createRewrite(id, resume.rawText);
+    await usageService.incrementUsage(req.user.id, 'rewrites');
 
     res.json(rewrite);
   },
 
-  improveRewrite: (req: Request, res: Response) => {
+  improveRewrite: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -45,13 +45,13 @@ export const rewriteController = {
     const { rewriteId } = req.params;
     const { prompt } = req.body;
 
-    const rewrite = rewriteService.getRewriteById(rewriteId);
+    const rewrite = await rewriteService.getRewriteById(rewriteId);
 
     if (!rewrite) {
       return sendNotFound(res, ERROR_MESSAGES.REWRITE_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, rewrite.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, rewrite.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
@@ -59,7 +59,7 @@ export const rewriteController = {
     res.json(improvement);
   },
 
-  updateRewrite: (req: Request, res: Response) => {
+  updateRewrite: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -67,17 +67,17 @@ export const rewriteController = {
     const { rewriteId } = req.params;
     const { rewrittenText, changes } = req.body;
 
-    const rewrite = rewriteService.getRewriteById(rewriteId);
+    const rewrite = await rewriteService.getRewriteById(rewriteId);
 
     if (!rewrite) {
       return sendNotFound(res, ERROR_MESSAGES.REWRITE_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, rewrite.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, rewrite.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const updatedRewrite = rewriteService.updateRewrite(rewriteId, {
+    const updatedRewrite = await rewriteService.updateRewrite(rewriteId, {
       rewrittenText,
       changes,
     });
@@ -93,23 +93,23 @@ export const rewriteController = {
     });
   },
 
-  getResumeRewrites: (req: Request, res: Response) => {
+  getResumeRewrites: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { id } = req.params;
-    const resume = resumeService.getResumeById(id);
+    const resume = await resumeService.getResumeById(id);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, id)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, id))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const resumeRewrites = rewriteService.getResumeRewrites(id);
+    const resumeRewrites = await rewriteService.getResumeRewrites(id);
 
     const rewriteList = resumeRewrites.map((rewrite) => ({
       rewriteId: rewrite.rewriteId,
@@ -124,19 +124,19 @@ export const rewriteController = {
     });
   },
 
-  getRewriteById: (req: Request, res: Response) => {
+  getRewriteById: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { rewriteId } = req.params;
-    const rewrite = rewriteService.getRewriteById(rewriteId);
+    const rewrite = await rewriteService.getRewriteById(rewriteId);
 
     if (!rewrite) {
       return sendNotFound(res, ERROR_MESSAGES.REWRITE_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, rewrite.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, rewrite.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 

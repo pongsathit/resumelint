@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
-import { CareerRepository } from '../repositories';
 import { CareerGapAnalysis, LearningRoadmap, Module, Role } from '../types';
+import { prisma } from '../utils/prisma';
+import { CareerRepository } from '../repositories/CareerRepository';
 
 const generateMockModules = (): Module[] => {
   return [
@@ -160,97 +161,176 @@ export const careerService = {
   }): Promise<CareerGapAnalysis> => {
     const gapAnalysisId = uuidv4();
 
-    return await CareerRepository.createGapAnalysis({
-      gapAnalysisId,
-      resumeId: params.resumeId,
-      currentRole: params.currentRole,
-      targetRole: params.targetRole,
-      gaps: {
-        technicalSkills: [
-          {
-            skill: 'System Design',
-            currentLevel: 'intermediate',
-            requiredLevel: 'expert',
-            gap: 'large',
-            importance: 'high',
-          },
-          {
-            skill: 'Distributed Systems',
-            currentLevel: 'beginner',
-            requiredLevel: 'expert',
-            gap: 'large',
-            importance: 'high',
-          },
-          {
-            skill: 'Performance Optimization',
-            currentLevel: 'intermediate',
-            requiredLevel: 'expert',
-            gap: 'large',
-            importance: 'high',
-          },
-        ],
-        systemDesign: [
-          {
-            skill: 'Distributed Systems',
-            gap: 'missing',
-            recommendation: 'Learn about CAP theorem, eventual consistency, and distributed consensus algorithms like Raft and Paxos',
-          },
-          {
-            skill: 'Scalability Patterns',
-            gap: 'large',
-            recommendation: 'Study horizontal scaling, load balancing, caching strategies, and database sharding',
-          },
-          {
-            skill: 'Microservices Architecture',
-            gap: 'large',
-            recommendation: 'Deepen understanding of service mesh, API gateway patterns, and inter-service communication',
-          },
-        ],
-        leadership: [
-          {
-            skill: 'Team Leadership',
-            gap: 'large',
-            recommendation: 'Gain experience leading larger teams (10+ engineers), managing technical roadmaps, and mentoring senior engineers',
-          },
-          {
-            skill: 'Cross-functional Collaboration',
-            gap: 'large',
-            recommendation: 'Work closely with product, design, and business stakeholders on strategic initiatives',
-          },
-          {
-            skill: 'Technical Strategy',
-            gap: 'missing',
-            recommendation: 'Develop skills in technology evaluation, architecture decision-making, and long-term technical planning',
-          },
-        ],
-      },
-      strengths: [
-        'Strong foundation in backend development with Node.js and TypeScript',
-        'Experience building microservices',
-        'Good understanding of database technologies',
-        'Team collaboration experience',
+    const gaps = {
+      technicalSkills: [
+        {
+          skill: 'System Design',
+          currentLevel: 'intermediate' as const,
+          requiredLevel: 'expert' as const,
+          gap: 'large' as const,
+          importance: 'high' as const,
+        },
+        {
+          skill: 'Distributed Systems',
+          currentLevel: 'beginner' as const,
+          requiredLevel: 'expert' as const,
+          gap: 'large' as const,
+          importance: 'high' as const,
+        },
+        {
+          skill: 'Performance Optimization',
+          currentLevel: 'intermediate' as const,
+          requiredLevel: 'expert' as const,
+          gap: 'large' as const,
+          importance: 'high' as const,
+        },
       ],
-    });
+      systemDesign: [
+        {
+          skill: 'Distributed Systems',
+          gap: 'missing' as const,
+          recommendation: 'Learn about CAP theorem, eventual consistency, and distributed consensus algorithms like Raft and Paxos',
+        },
+        {
+          skill: 'Scalability Patterns',
+          gap: 'large' as const,
+          recommendation: 'Study horizontal scaling, load balancing, caching strategies, and database sharding',
+        },
+        {
+          skill: 'Microservices Architecture',
+          gap: 'large' as const,
+          recommendation: 'Deepen understanding of service mesh, API gateway patterns, and inter-service communication',
+        },
+      ],
+      leadership: [
+        {
+          skill: 'Team Leadership',
+          gap: 'large' as const,
+          recommendation: 'Gain experience leading larger teams (10+ engineers), managing technical roadmaps, and mentoring senior engineers',
+        },
+        {
+          skill: 'Cross-functional Collaboration',
+          gap: 'large' as const,
+          recommendation: 'Work closely with product, design, and business stakeholders on strategic initiatives',
+        },
+        {
+          skill: 'Technical Strategy',
+          gap: 'missing' as const,
+          recommendation: 'Develop skills in technology evaluation, architecture decision-making, and long-term technical planning',
+        },
+      ],
+    };
+
+    const strengths = [
+      'Strong foundation in backend development with Node.js and TypeScript',
+      'Experience building microservices',
+      'Good understanding of database technologies',
+      'Team collaboration experience',
+    ];
+
+    try {
+      const dbGapAnalysis = await prisma.career_gap_analyses.create({
+        data: {
+          id: gapAnalysisId,
+          resumeId: params.resumeId,
+          currentRole: params.currentRole,
+          targetRole: params.targetRole,
+          gaps: gaps as any,
+          strengths: strengths as any,
+        },
+      });
+
+      return {
+        gapAnalysisId: dbGapAnalysis.id,
+        resumeId: dbGapAnalysis.resumeId,
+        currentRole: dbGapAnalysis.currentRole as Role,
+        targetRole: dbGapAnalysis.targetRole as Role,
+        gaps: dbGapAnalysis.gaps as unknown as CareerGapAnalysis['gaps'],
+        strengths: dbGapAnalysis.strengths as unknown as string[],
+        generatedAt: dbGapAnalysis.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error creating career gap analysis:', error);
+      throw new Error('Failed to create career gap analysis');
+    }
   },
 
   getCareerGapAnalysisById: async (gapAnalysisId: string): Promise<CareerGapAnalysis | null> => {
-    return await CareerRepository.getGapAnalysisById(gapAnalysisId);
+    try {
+      const dbGapAnalysis = await prisma.career_gap_analyses.findUnique({
+        where: { id: gapAnalysisId },
+      });
+
+      if (!dbGapAnalysis) {
+        return null;
+      }
+
+      return {
+        gapAnalysisId: dbGapAnalysis.id,
+        resumeId: dbGapAnalysis.resumeId,
+        currentRole: dbGapAnalysis.currentRole as Role,
+        targetRole: dbGapAnalysis.targetRole as Role,
+        gaps: dbGapAnalysis.gaps as unknown as CareerGapAnalysis['gaps'],
+        strengths: dbGapAnalysis.strengths as unknown as string[],
+        generatedAt: dbGapAnalysis.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching career gap analysis by ID:', error);
+      return null;
+    }
   },
 
   createLearningRoadmap: async (params: { gapAnalysisId: string; timeline?: number }): Promise<LearningRoadmap> => {
     const roadmapId = uuidv4();
+    const modules = generateMockModules();
 
-    return await CareerRepository.createLearningRoadmap({
-      roadmapId,
-      gapAnalysisId: params.gapAnalysisId,
-      timeline: params.timeline || 30,
-      modules: generateMockModules(),
-      estimatedTotalHours: 40,
-    });
+    try {
+      const dbRoadmap = await prisma.learning_roadmaps.create({
+        data: {
+          id: roadmapId,
+          gapAnalysisId: params.gapAnalysisId,
+          timeline: params.timeline || 30,
+          modules: modules as any,
+          estimatedTotalHours: 40,
+        },
+      });
+
+      return {
+        roadmapId: dbRoadmap.id,
+        gapAnalysisId: dbRoadmap.gapAnalysisId,
+        timeline: dbRoadmap.timeline,
+        modules: dbRoadmap.modules as unknown as Module[],
+        estimatedTotalHours: dbRoadmap.estimatedTotalHours,
+        generatedAt: dbRoadmap.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error creating learning roadmap:', error);
+      throw new Error('Failed to create learning roadmap');
+    }
   },
 
   getLearningRoadmapById: async (roadmapId: string): Promise<LearningRoadmap | null> => {
-    return await CareerRepository.getLearningRoadmapById(roadmapId);
+    try {
+      const dbRoadmap = await prisma.learning_roadmaps.findUnique({
+        where: { id: roadmapId },
+      });
+
+      if (!dbRoadmap) {
+        return null;
+      }
+
+      return {
+        roadmapId: dbRoadmap.id,
+        gapAnalysisId: dbRoadmap.gapAnalysisId,
+        timeline: dbRoadmap.timeline,
+        modules: dbRoadmap.modules as unknown as Module[],
+        estimatedTotalHours: dbRoadmap.estimatedTotalHours,
+        generatedAt: dbRoadmap.generatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching learning roadmap by ID:', error);
+      return null;
+    }
   },
 
   updateRoadmapProgress: async (roadmap: LearningRoadmap, moduleId: string, topicId?: string, completed?: boolean) => {

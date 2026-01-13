@@ -18,6 +18,7 @@ export type ResumeStatus = 'parsed' | 'processing' | 'error';
 export interface User {
   id: string;
   email: string;
+  password?: string; // Optional: bcrypt hashed password (only for email auth)
   name: string;
   avatar: string;
   subscriptionTier: SubscriptionTier;

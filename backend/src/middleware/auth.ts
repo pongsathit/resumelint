@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { mockHelpers } from '../models/mockData';
+import { authService } from '../services/authService';
 
 // Extend Express Request type to include user
 declare global {
@@ -15,7 +15,7 @@ declare global {
   }
 }
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -26,7 +26,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   }
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const user = mockHelpers.getUserByAccessToken(token);
+  const user = await authService.getUserByAccessToken(token);
 
   if (!user) {
     return res.status(401).json({
@@ -46,12 +46,12 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
   next();
 };
 
-export const optionalAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const optionalAuthMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7);
-    const user = mockHelpers.getUserByAccessToken(token);
+    const user = await authService.getUserByAccessToken(token);
 
     if (user) {
       req.user = {

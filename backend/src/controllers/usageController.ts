@@ -4,12 +4,12 @@ import { sendUnauthorized, sendNotFound } from '../utils/errors';
 import { ERROR_MESSAGES } from '../constants/errors';
 
 export const usageController = {
-  getUsage: (req: Request, res: Response) => {
+  getUsage: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
-    const user = userService.getUserById(req.user.id);
+    const user = await userService.getUserById(req.user.id);
 
     if (!user) {
       return sendNotFound(res, ERROR_MESSAGES.USER_NOT_FOUND);

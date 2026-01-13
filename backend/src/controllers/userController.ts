@@ -5,12 +5,12 @@ import { validateRole } from '../utils/validators';
 import { ERROR_MESSAGES } from '../constants/errors';
 
 export const userController = {
-  getMe: (req: Request, res: Response) => {
+  getMe: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
-    const user = userService.getUserById(req.user.id);
+    const user = await userService.getUserById(req.user.id);
 
     if (!user) {
       return sendNotFound(res, ERROR_MESSAGES.USER_NOT_FOUND);
@@ -28,7 +28,7 @@ export const userController = {
     });
   },
 
-  updateMe: (req: Request, res: Response) => {
+  updateMe: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -42,7 +42,7 @@ export const userController = {
       }
     }
 
-    const user = userService.updateUser(req.user.id, { name, defaultRole });
+    const user = await userService.updateUser(req.user.id, { name, defaultRole });
 
     if (!user) {
       return sendNotFound(res, ERROR_MESSAGES.USER_NOT_FOUND);

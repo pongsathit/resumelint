@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
-import { RewriteRepository } from '../repositories';
 import { Rewrite, Change } from '../types';
+import { prisma } from '../utils/prisma';
 
 const generateMockChanges = (): Change[] => {
   return [
@@ -35,31 +35,137 @@ const generateRewrittenText = (originalText: string): string => {
 export const rewriteService = {
   createRewrite: async (resumeId: string, originalText: string): Promise<Rewrite> => {
     const rewriteId = uuidv4();
+    const changes = generateMockChanges();
+    const scoreImprovement = {
+      before: 65,
+      after: 85,
+      delta: 20,
+    };
 
-    return await RewriteRepository.createRewrite({
-      rewriteId,
-      resumeId,
-      originalText,
-      rewrittenText: generateRewrittenText(originalText),
-      changes: generateMockChanges(),
-      scoreImprovement: {
-        before: 65,
-        after: 85,
-        delta: 20,
-      },
-    });
+    try {
+      const dbRewrite = await prisma.rewrites.create({
+        data: {
+          id: rewriteId,
+          resumeId,
+          originalText,
+          rewrittenText: generateRewrittenText(originalText),
+          changes: changes as any,
+          scoreImprovement: scoreImprovement as any,
+          version: 1,
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        rewriteId: dbRewrite.id,
+        resumeId: dbRewrite.resumeId,
+        originalText: dbRewrite.originalText,
+        rewrittenText: dbRewrite.rewrittenText,
+        changes: dbRewrite.changes as unknown as Change[],
+        scoreImprovement: dbRewrite.scoreImprovement as Rewrite['scoreImprovement'],
+        version: dbRewrite.version,
+        generatedAt: dbRewrite.generatedAt.toISOString(),
+        updatedAt: dbRewrite.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error creating rewrite:', error);
+      throw new Error('Failed to create rewrite');
+    }
   },
 
   getRewriteById: async (rewriteId: string): Promise<Rewrite | null> => {
-    return await RewriteRepository.getRewriteById(rewriteId);
+    try {
+      const dbRewrite = await prisma.rewrites.findUnique({
+        where: { id: rewriteId },
+      });
+
+      if (!dbRewrite) {
+        return null;
+      }
+
+      return {
+        rewriteId: dbRewrite.id,
+        resumeId: dbRewrite.resumeId,
+        originalText: dbRewrite.originalText,
+        rewrittenText: dbRewrite.rewrittenText,
+        changes: dbRewrite.changes as unknown as Change[],
+        scoreImprovement: dbRewrite.scoreImprovement as Rewrite['scoreImprovement'],
+        version: dbRewrite.version,
+        generatedAt: dbRewrite.generatedAt.toISOString(),
+        updatedAt: dbRewrite.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error fetching rewrite by ID:', error);
+      return null;
+    }
   },
 
   getResumeRewrites: async (resumeId: string): Promise<Rewrite[]> => {
-    return await RewriteRepository.getResumeRewrites(resumeId);
+    try {
+      const dbRewrites = await prisma.rewrites.findMany({
+        where: { resumeId },
+        orderBy: { generatedAt: 'desc' },
+      });
+
+      return dbRewrites.map((dbRewrite) => ({
+        rewriteId: dbRewrite.id,
+        resumeId: dbRewrite.resumeId,
+        originalText: dbRewrite.originalText,
+        rewrittenText: dbRewrite.rewrittenText,
+        changes: dbRewrite.changes as unknown as Change[],
+        scoreImprovement: dbRewrite.scoreImprovement as Rewrite['scoreImprovement'],
+        version: dbRewrite.version,
+        generatedAt: dbRewrite.generatedAt.toISOString(),
+        updatedAt: dbRewrite.updatedAt.toISOString(),
+      }));
+    } catch (error) {
+      console.error('Error fetching resume rewrites:', error);
+      return [];
+    }
   },
 
   updateRewrite: async (rewriteId: string, updates: { rewrittenText?: string; changes?: Change[] }): Promise<Rewrite | null> => {
-    return await RewriteRepository.updateRewrite(rewriteId, updates);
+    try {
+      const existingRewrite = await prisma.rewrites.findUnique({
+        where: { id: rewriteId },
+      });
+
+      if (!existingRewrite) {
+        return null;
+      }
+
+      const updateData: any = {
+        version: existingRewrite.version + 1,
+        updatedAt: new Date(),
+      };
+
+      if (updates.rewrittenText) {
+        updateData.rewrittenText = updates.rewrittenText;
+      }
+      if (updates.changes) {
+        updateData.changes = updates.changes as any;
+      }
+
+      const dbRewrite = await prisma.rewrites.update({
+        where: { id: rewriteId },
+        data: updateData,
+      });
+
+      return {
+        rewriteId: dbRewrite.id,
+        resumeId: dbRewrite.resumeId,
+        originalText: dbRewrite.originalText,
+        rewrittenText: dbRewrite.rewrittenText,
+        changes: dbRewrite.changes as unknown as Change[],
+        scoreImprovement: dbRewrite.scoreImprovement as Rewrite['scoreImprovement'],
+        version: dbRewrite.version,
+        generatedAt: dbRewrite.generatedAt.toISOString(),
+        updatedAt: dbRewrite.updatedAt.toISOString(),
+      };
+    } catch (error) {
+      console.error('Error updating rewrite:', error);
+      return null;
+    }
   },
 
   improveRewrite: (prompt: string) => {

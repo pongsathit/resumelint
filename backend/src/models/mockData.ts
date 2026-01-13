@@ -9,12 +9,17 @@ import {
   CareerGapAnalysis,
   LearningRoadmap
 } from '../types';
+import { verifyPassword } from '../utils/password';
 
 // Mock Users Store
+// Mock passwords (for testing):
+// - john.doe@example.com: password123
+// - jane.smith@example.com: propassword456
 export const users: Map<string, User> = new Map([
   ['user-1', {
     id: 'user-1',
     email: 'john.doe@example.com',
+    password: '$2b$12$/7JIEsyOsRmI8B2Cv/9L/.qZjeLf1Altie9nndJ45Yb2KmpwBwXbm', // password123 (bcrypt hashed)
     name: 'John Doe',
     avatar: 'https://i.pravatar.cc/150?img=1',
     subscriptionTier: 'free',
@@ -34,6 +39,7 @@ export const users: Map<string, User> = new Map([
   ['user-2', {
     id: 'user-2',
     email: 'jane.smith@example.com',
+    password: '$2b$12$q37a8M2VH/dg1Jp94gr45.SRhyrYeRw4HyZXrEYvFlxlQ6Xn8J.OW', // propassword456 (bcrypt hashed)
     name: 'Jane Smith',
     avatar: 'https://i.pravatar.cc/150?img=2',
     subscriptionTier: 'pro',
@@ -87,12 +93,21 @@ export const learningRoadmaps: Map<string, LearningRoadmap> = new Map();
 
 // Helper functions to manage mock data
 export const mockHelpers = {
-  // Get user by email and password (simplified auth)
-  getUserByCredentials: (email: string, password: string): User | undefined => {
+  // Get user by email and password (with bcrypt verification)
+  getUserByCredentials: async (email: string, password: string): Promise<User | undefined> => {
     for (const user of users.values()) {
       if (user.email === email) {
-        // In mock, any password works
-        return user;
+        // Verify password if user has one stored (email auth)
+        if (user.password) {
+          const isPasswordValid = await verifyPassword(password, user.password);
+          if (isPasswordValid) {
+            return user;
+          }
+          // Password doesn't match - return undefined
+          return undefined;
+        }
+        // No password stored (OAuth user) - should not authenticate with email/password
+        return undefined;
       }
     }
     return undefined;

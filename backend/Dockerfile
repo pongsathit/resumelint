@@ -14,7 +14,9 @@ WORKDIR /app
 # Install system dependencies
 RUN apk add --no-cache \
     curl \
-    tini
+    tini \
+    openssl \
+    libc6-compat
 
 # Copy package files
 COPY package*.json ./
@@ -26,6 +28,12 @@ FROM base AS development
 
 # Install all dependencies (including devDependencies)
 RUN npm ci
+
+# Copy Prisma schema first (needed for client generation)
+COPY prisma ./prisma
+
+# Generate Prisma Client during build (ensures it's available on container start)
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Copy source code
 COPY . .

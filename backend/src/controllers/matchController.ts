@@ -7,7 +7,7 @@ import { ERROR_MESSAGES } from '../constants/errors';
 import { PAGINATION_DEFAULTS, RATE_LIMIT } from '../constants/validation';
 
 export const matchController = {
-  createJobDescription: (req: Request, res: Response) => {
+  createJobDescription: async (req: Request, res: Response) => {
     const { rawText, title, company } = req.body;
 
     if (!rawText) {
@@ -16,7 +16,7 @@ export const matchController = {
       ]);
     }
 
-    const jobDescription = matchService.createJobDescription({
+    const jobDescription = await matchService.createJobDescription({
       userId: req.user?.id,
       rawText,
       title,
@@ -26,7 +26,7 @@ export const matchController = {
     res.json(jobDescription);
   },
 
-  matchResume: (req: Request, res: Response) => {
+  matchResume: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -34,24 +34,24 @@ export const matchController = {
     const { resumeId } = req.params;
     const { jobDescriptionId, jobDescriptionText } = req.body;
 
-    const resume = resumeService.getResumeById(resumeId);
+    const resume = await resumeService.getResumeById(resumeId);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    if (!usageService.canPerformAction(req.user.id, 'matches')) {
+    if (!(await usageService.canPerformAction(req.user.id, 'matches'))) {
       return sendRateLimitError(res, ERROR_MESSAGES.RATE_LIMIT, RATE_LIMIT.RETRY_AFTER);
     }
 
     let jdId = jobDescriptionId;
 
     if (!jdId && jobDescriptionText) {
-      const jd = matchService.createJobDescription({
+      const jd = await matchService.createJobDescription({
         userId: req.user.id,
         rawText: jobDescriptionText,
         title: 'Job Position',
@@ -66,13 +66,13 @@ export const matchController = {
       ]);
     }
 
-    const match = matchService.createMatch(resumeId, jdId);
-    usageService.incrementUsage(req.user.id, 'matches');
+    const match = await matchService.createMatch(resumeId, jdId);
+    await usageService.incrementUsage(req.user.id, 'matches');
 
     res.json(match);
   },
 
-  getResumeMatches: (req: Request, res: Response) => {
+  getResumeMatches: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
@@ -81,33 +81,35 @@ export const matchController = {
     const page = parseInt(req.query.page as string) || PAGINATION_DEFAULTS.PAGE;
     const limit = parseInt(req.query.limit as string) || PAGINATION_DEFAULTS.LIMIT;
 
-    const resume = resumeService.getResumeById(resumeId);
+    const resume = await resumeService.getResumeById(resumeId);
 
     if (!resume) {
       return sendNotFound(res, ERROR_MESSAGES.RESUME_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
-    const resumeMatches = matchService.getResumeMatches(resumeId);
+    const resumeMatches = await matchService.getResumeMatches(resumeId);
 
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedMatches = resumeMatches.slice(startIndex, endIndex);
 
-    const matchList = paginatedMatches.map((match) => {
-      const jd = matchService.getJobDescriptionById(match.jobDescriptionId);
-      return {
-        matchId: match.matchId,
-        jobDescriptionId: match.jobDescriptionId,
-        jobTitle: jd?.title || 'Unknown',
-        company: jd?.company || 'Unknown',
-        matchScore: match.matchScore,
-        createdAt: match.generatedAt,
-      };
-    });
+    const matchList = await Promise.all(
+      paginatedMatches.map(async (match) => {
+        const jd = await matchService.getJobDescriptionById(match.jobDescriptionId);
+        return {
+          matchId: match.matchId,
+          jobDescriptionId: match.jobDescriptionId,
+          jobTitle: jd?.title || 'Unknown',
+          company: jd?.company || 'Unknown',
+          matchScore: match.matchScore,
+          createdAt: match.generatedAt,
+        };
+      })
+    );
 
     res.json({
       matches: matchList,
@@ -120,19 +122,19 @@ export const matchController = {
     });
   },
 
-  getMatchById: (req: Request, res: Response) => {
+  getMatchById: async (req: Request, res: Response) => {
     if (!req.user) {
       return sendUnauthorized(res, ERROR_MESSAGES.AUTH_REQUIRED);
     }
 
     const { matchId } = req.params;
-    const match = matchService.getMatchById(matchId);
+    const match = await matchService.getMatchById(matchId);
 
     if (!match) {
       return sendNotFound(res, ERROR_MESSAGES.MATCH_NOT_FOUND);
     }
 
-    if (!resumeService.userOwnsResume(req.user.id, match.resumeId)) {
+    if (!(await resumeService.userOwnsResume(req.user.id, match.resumeId))) {
       return sendForbidden(res, ERROR_MESSAGES.FORBIDDEN_ACCESS);
     }
 
